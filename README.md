@@ -51,30 +51,35 @@ This project provides the following:
 1. A community-based **Standard on Plugin Compatibility Metadata** the Dataverse core can read, even without loading classes.
    This is important to avoid loading a plugin which may break the core.
    It also allows future extension points like checking plugin signatures or licenses.
-   Tooling to enable plugin authors to create the metadata more easily is a plus.
-2. An **SPI Loader Module** for the Dataverse core to load plugins with.
+   Tooling to enable plugin authors to create the metadata more easily is a plus.  
+   (TODO: link to document)
+2. An **SPI Loader Module** as a core-side helper, making it easier in Dataverse to load plugins.
    Using a single place to define a custom classloader, reusable in the different core areas that are to support plugins reduces overhead.
-   Also, including the code to deal with reading and checking plugin metadata in sync with the standard avoids diverging.
-3. A **Development Policy** on how to SPI modules must be developed.
-   It's imperative to define a solid foundation developers can follow, avoiding too many breaking changes later on.
+   Also, including the code to deal with reading and checking plugin metadata in sync with the standard avoids diverging.  
+   (TODO: link to code)
+3. A **Development Policy** for SPI module and SPI API contract coding.
+   It's imperative to define a solid foundation developers can follow, avoiding too many breaking changes later on.  
+   (TODO: link to document)
 4. An **SPI Core Module**.
    Acting as a place to keep common resources like DTOs, configuration, etc it is the "shared fate" for all other SPI modules.
    It must be kept as stable and unbreakable as possible, with a most conservative habit of changing it.
-   Any SPI module and plugin will require updating when adding breaking changes to it.
+   Any SPI module and plugin will require updating when adding breaking changes to it.  
+   (TODO: link to code)
 5. A **Release Workflow** for SPI modules, based on a *Git tag per module (version)*.
    As modules must be releasable on their own in case of changes to them, we must not create a workflow that forces lock-step versioning.
    Instead, this project uses Git tags following this pattern: `spi-<module>-<version>`.
-   Using Continuous Integration (CI) will allow releasing SPI modules independently and easily for SPI maintainers either on tag creation or manually.
+   Using Continuous Integration (CI) will allow releasing SPI modules independently and easily for SPI maintainers either on tag creation or manually.  
+   (TODO: link to document / workflows)
 
 On the other hand, what this project will not provide:
 
 1. Platform information.
-   Only compile-time API alignment (what types exist; what signatures authors compile against) will be offered.
-   It is not intended as runtime/test matrix alignment (what the Dataverse core + Payara actually provides when the plugin runs).
-   At a future point in time, the main Dataverse project will provide platform information per release, consumable as BOMs.
-2. Parent information.
-   No standardize build hygiene and common tooling across the ecosystem will be offered.
-   Use [io.gdcc:parent](https://github.com/gdcc/maven-parent) for that.
+   Platform alignment is defined by Dataverse core releases, not by this repository.
+   This project provides compile-time SPI contracts and plugin metadata/compatibility negotiation.
+   A Dataverse release may additionally publish a platform BOM describing the runtime stack (e.g., application server / Jakarta EE implementation).
+2. Maven parent POM
+   This project does not provide a Maven parent for build conventions (plugins, formatting, etc.).
+   Use the GDCC Maven Parent [io.gdcc:parent](https://github.com/gdcc/maven-parent) for standardized build hygiene and common tooling.
 
 ## Versioning Policy
 
