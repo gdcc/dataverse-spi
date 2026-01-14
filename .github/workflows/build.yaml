@@ -1,0 +1,23 @@
+name: Build
+on:
+  pull_request:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Determine Java version from POM
+        run: |
+          echo "JAVA_VERSION=$(mvn initialize help:evaluate -Dexpression=jdk.version -q -DforceStdout)" >> ${GITHUB_ENV}
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build, test, analyze
+        run: mvn -B verify
