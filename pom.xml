@@ -12,11 +12,14 @@
     
     <groupId>io.gdcc</groupId>
     <artifactId>dataverse-spi</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <version>2.2.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
     
     <name>Dataverse SPI Plugin API</name>
     <url>https://dataverse.org</url>
+    <modules>
+        <module>core</module>
+    </modules>
     <description>
         A package to create out-of-tree Java code for Dataverse Software. Plugin projects can use this package
         as an API dependency just like Jakarta EE APIs if they want to create external plugins. These will be loaded
@@ -31,19 +34,29 @@
         </developer>
     </developers>
     
-    <dependencies>
-        <dependency>
-            <groupId>jakarta.json</groupId>
-            <artifactId>jakarta.json-api</artifactId>
-            <scope>provided</scope>
-            <!-- no version here as managed by parent -->
-        </dependency>
-        <dependency>
-            <groupId>jakarta.ws.rs</groupId>
-            <artifactId>jakarta.ws.rs-api</artifactId>
-            <scope>provided</scope>
-            <!-- no version here as managed by parent -->
-        </dependency>
-    </dependencies>
+    <properties>
+        <jdk.version>17</jdk.version>
+    </properties>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <dependencies>
+                    <!-- Necessary for Markdown Support -->
+                    <dependency>
+                        <groupId>org.apache.maven.doxia</groupId>
+                        <artifactId>doxia-module-markdown</artifactId>
+                        <version>2.0.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <reporting>
+        <excludeDefaults>true</excludeDefaults>
+    </reporting>
     
 </project>
