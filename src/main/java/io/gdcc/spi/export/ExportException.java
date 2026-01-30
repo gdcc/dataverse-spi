@@ -1,8 +1,6 @@
 package io.gdcc.spi.export;
 
-import java.io.IOException;
-
-public class ExportException extends IOException {
+public class ExportException extends RuntimeException {
     public ExportException(String message) {
         super(message);
     }
