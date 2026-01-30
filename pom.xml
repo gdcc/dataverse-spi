@@ -44,6 +44,13 @@
             <scope>provided</scope>
             <!-- no version here as managed by parent -->
         </dependency>
+        
+        <!-- TESTING -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     
 </project>
