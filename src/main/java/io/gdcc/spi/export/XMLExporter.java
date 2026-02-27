@@ -31,7 +31,8 @@ public interface XMLExporter extends Exporter {
     /**
      * @return - should always be MediaType.APPLICATION_XML
      */
-    public default String getMediaType() {
+    @Override
+    default String getMediaType() {
         return MediaType.APPLICATION_XML;
-    };
+    }
 }
