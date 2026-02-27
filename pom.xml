@@ -31,6 +31,10 @@
         </developer>
     </developers>
     
+    <properties>
+        <jdk.version>17</jdk.version>
+    </properties>
+    
     <dependencies>
         <dependency>
             <groupId>jakarta.json</groupId>
