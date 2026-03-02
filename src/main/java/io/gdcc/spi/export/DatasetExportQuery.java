@@ -1,252 +1,205 @@
 package io.gdcc.spi.export;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * Provides an optional mechanism for defining various data retrieval options 
- * for the export subsystem in a way that should allow us adding support for 
- * more options going forward with minimal or no changes to the already 
- * implemented export plugins. 
+ * Defines <em>what</em> dataset metadata to retrieve and at what level of detail
+ * for dataset-oriented export operations.
+ * <p>
+ * This is a pure data-shape specification: it answers which aspects of a dataset
+ * should be included in an export, and optionally how file metadata nested within
+ * that dataset should be shaped. It deliberately does not address <em>which</em>
+ * datasets to operate on (that is a selection concern at a higher level), nor
+ * <em>how much</em> data to retrieve per call — pagination is a separate,
+ * orthogonal concern expressed via a {@code PageRequest} at the method level.
+ * <p>
+ * File metadata shaping is optional: if no {@link FileExportQuery} is provided,
+ * methods that include file metadata will apply their own defaults. Methods that
+ * do not return file metadata will ignore any nested {@link FileExportQuery}.
+ * <p>
+ * Instances are immutable and must be constructed via {@link #builder()}.
+ * Use {@link #defaults()} for the standard query with no special filtering.
+ *
+ * @see FileExportQuery
+ * @see DatasetMetadataPredicates
  */
-public final class ExportDataContext {
+public final class DatasetExportQuery {
     
-    private final boolean datasetMetadataOnly;
-    private final boolean publicFilesOnly;
-    private final int offset;
-    private final int length;
+    private final Set<DatasetMetadataPredicates> datasetPredicates;
+    private final FileExportQuery fileQuery;
     
     /**
-     * Default context with no special options.
+     * Default query, including all dataset metadata and applying file metadata defaults.
      */
-    private static final ExportDataContext DEFAULT = builder().build();
+    private static final DatasetExportQuery DEFAULT = builder().build();
     
-    private ExportDataContext(Builder builder) {
-        this.datasetMetadataOnly = builder.datasetMetadataOnly;
-        this.publicFilesOnly = builder.publicFilesOnly;
-        this.offset = builder.offset;
-        this.length = builder.length;
+    private DatasetExportQuery(Builder builder) {
+        this.datasetPredicates = Set.copyOf(builder.datasetPredicates);
+        this.fileQuery = builder.fileQuery;
     }
     
     /**
-     * Returns a builder for creating new contexts.
+     * Returns a builder for creating new queries.
+     *
+     * @return a new {@link Builder} instance
      */
     public static Builder builder() {
         return new Builder();
     }
     
     /**
-     * Returns a default context with no special options.
+     * Returns the default query, which includes all dataset metadata with no special
+     * filtering, and defers file metadata shaping to method-level defaults.
+     *
+     * @return the shared default {@link DatasetExportQuery} instance
      */
-    public static ExportDataContext defaults() {
+    public static DatasetExportQuery defaults() {
         return DEFAULT;
     }
     
     /**
-     * Builder for ExportDataContext.
+     * Builder for {@link DatasetExportQuery}.
+     * <p>
+     * Obtain an instance via {@link DatasetExportQuery#builder()} or
+     * {@link Builder#from(DatasetExportQuery)} to derive a new query from an existing one.
      */
     public static class Builder {
-        private int offset = 0; // default: no offset = beginning
-        private int length = 0; // default: no length = no limit
-        private boolean datasetMetadataOnly = false;
-        private boolean publicFilesOnly = false;
+        private final Set<DatasetMetadataPredicates> datasetPredicates = new HashSet<>();
+        private FileExportQuery fileQuery = null;
         
         private Builder() {
-            // Hiding constructor to enforce use of static factory method
+            // Hiding constructor to enforce use of the static factory method
         }
         
         /**
-         * Excludes file-level metadata from the export.
-         */
-        public Builder datasetMetadataOnly() {
-            this.datasetMetadataOnly = true;
-            return this;
-        }
-        
-        /**
-         * Sets whether to exclude file-level metadata.
-         */
-        public Builder datasetMetadataOnly(boolean value) {
-            this.datasetMetadataOnly = value;
-            return this;
-        }
-        
-        /**
-         * Includes only public (non-restricted, non-embargoed) files.
-         */
-        public Builder publicFilesOnly() {
-            this.publicFilesOnly = true;
-            return this;
-        }
-        
-        /**
-         * Sets whether to include only public files.
-         */
-        public Builder publicFilesOnly(boolean value) {
-            this.publicFilesOnly = value;
-            return this;
-        }
-        
-        /**
-         * Sets the starting position for results (0-based).
+         * Sets the dataset metadata predicates, replacing any previously set predicates.
          *
-         * @param offset zero-based starting position (must be >= 0)
-         * @return this builder
+         * @param predicates the dataset metadata predicates to set
+         * @return this builder instance
          */
-        public Builder offset(int offset) {
-            this.offset = offset;
+        public Builder datasetPredicates(DatasetMetadataPredicates... predicates) {
+            this.datasetPredicates.clear();
+            this.datasetPredicates.addAll(Set.of(predicates));
             return this;
         }
         
         /**
-         * Sets the maximum number of results to return.
+         * Sets the dataset metadata predicates, replacing any previously set predicates.
          *
-         * @param length maximum number of items (0 = unlimited, must be >= 0)
-         * @return this builder
+         * @param predicates the dataset metadata predicates to set
+         * @return this builder instance
          */
-        public Builder length(int length) {
-            this.length = length;
+        public Builder datasetPredicates(Collection<DatasetMetadataPredicates> predicates) {
+            this.datasetPredicates.clear();
+            this.datasetPredicates.addAll(predicates);
             return this;
         }
         
         /**
-         * Convenience method to set both offset and length together.
+         * Adds a dataset metadata predicate to the builder's collection of predicates.
          *
-         * @param offset zero-based starting position (must be >= 0)
-         * @param length maximum number of items (0 = unlimited, must be >= 0)
-         * @return this builder
-         * @apiNote Pagination is primarily intended for retrieving specific subsets,
-         *          not for iterating through large datasets. For full exports of
-         *          large datasets, consider using streaming methods if available.
+         * @param predicate the dataset metadata predicate to add
+         * @return this builder instance
          */
-        public Builder pagination(int offset, int length) {
-            this.offset = offset;
-            this.length = length;
+        public Builder addDatasetPredicate(DatasetMetadataPredicates predicate) {
+            this.datasetPredicates.add(predicate);
             return this;
         }
         
         /**
-         * Builds an immutable ExportDataContext.
+         * Sets the {@link FileExportQuery} to use for shaping file metadata nested
+         * within this dataset query. Replaces any previously set file query.
+         * <p>
+         * If not set, methods that include file metadata will apply their own defaults.
          *
-         * @return validated context
-         * @throws IllegalArgumentException if validation fails
+         * @param fileQuery the file export query to compose into this dataset query
+         * @return this builder instance
          */
-        public ExportDataContext build() {
-            // Validate business rules
-            if (offset < 0) {
-                throw new IllegalArgumentException(
-                    "offset must be non-negative, got: " + offset
-                );
-            }
-            
-            if (length < 0) {
-                throw new IllegalArgumentException(
-                    "length must be non-negative (0 = unlimited), got: " + length
-                );
-            }
-            
-            return new ExportDataContext(this);
+        public Builder fileQuery(FileExportQuery fileQuery) {
+            this.fileQuery = fileQuery;
+            return this;
         }
         
         /**
-         * Copies the properties from the given {@link ExportDataContext} instance into a new {@code Builder}.
+         * Builds an immutable {@link DatasetExportQuery}.
          *
-         * @param source the {@code ExportDataContext} instance from which to copy properties
-         * @return a new {@code Builder} instance with properties copied from the provided context
+         * @return a new, validated {@link DatasetExportQuery}
+         * @throws IllegalArgumentException if the predicate combination is invalid,
+         *         e.g. due to conflicting predicates
          */
-        public Builder from(ExportDataContext source) {
+        public DatasetExportQuery build() {
+            return new DatasetExportQuery(this);
+        }
+        
+        /**
+         * Creates a new {@link Builder} pre-populated with the state of the given query,
+         * useful for deriving a modified copy without altering the original.
+         *
+         * @param source the {@link DatasetExportQuery} instance to copy from
+         * @return a new {@code Builder} with the same predicates and file query as {@code source}
+         */
+        public Builder from(DatasetExportQuery source) {
             return new Builder()
-                .datasetMetadataOnly(source.datasetMetadataOnly)
-                .publicFilesOnly(source.publicFilesOnly)
-                .offset(source.offset)
-                .length(source.length);
+                .datasetPredicates(source.datasetPredicates)
+                .fileQuery(source.fileQuery);
         }
     }
     
     // Getters
     
-    public boolean isDatasetMetadataOnly() {
-        return datasetMetadataOnly;
-    }
-    
-    public boolean isPublicFilesOnly() {
-        return publicFilesOnly;
-    }
-    
     /**
-     * Returns the starting offset for results.
+     * Returns the dataset metadata predicates that control which aspects of the dataset
+     * are included in the export.
      *
-     * @return zero-based offset (0 = start from beginning)
+     * @return an unmodifiable set of {@link DatasetMetadataPredicates}; never {@code null}
      */
-    public int getOffset() {
-        return offset;
+    public Set<DatasetMetadataPredicates> getDatasetPredicates() {
+        return datasetPredicates;
     }
     
     /**
-     * Returns the maximum number of results to return.
+     * Returns the optional {@link FileExportQuery} that controls how file metadata
+     * nested within this dataset export should be shaped.
+     * <p>
+     * An empty {@link Optional} means no explicit file query was specified; methods
+     * that include file metadata will apply their own defaults in that case.
      *
-     * @return maximum length (0 = unlimited)
+     * @return an {@link Optional} containing the file export query, or empty if not set
      */
-    public int getLength() {
-        return length;
-    }
-    
-    /**
-     * @return true if a non-zero offset is configured
-     */
-    public boolean hasOffset() {
-        return offset > 0;
-    }
-    
-    /**
-     * @return true if length is limited (non-zero)
-     */
-    public boolean hasLengthLimit() {
-        return length > 0;
+    public Optional<FileExportQuery> getFileQuery() {
+        return Optional.ofNullable(fileQuery);
     }
     
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ExportDataContext that = (ExportDataContext) o;
-        return datasetMetadataOnly == that.datasetMetadataOnly &&
-            publicFilesOnly == that.publicFilesOnly &&
-            offset == that.offset &&
-            length == that.length;
+        DatasetExportQuery that = (DatasetExportQuery) o;
+        return datasetPredicates.equals(that.datasetPredicates)
+            && Objects.equals(fileQuery, that.fileQuery);
     }
     
     @Override
     public int hashCode() {
-        return Objects.hash(datasetMetadataOnly, publicFilesOnly, offset, length);
+        return Objects.hash(datasetPredicates, fileQuery);
     }
     
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("ExportDataContext{");
-        boolean hasContent = false;
+        StringBuilder sb = new StringBuilder("DatasetExportQuery{");
         
-        if (datasetMetadataOnly) {
-            sb.append("datasetMetadataOnly");
-            hasContent = true;
+        if (!datasetPredicates.isEmpty()) {
+            sb.append("datasetPredicates=").append(datasetPredicates).append(", ");
         }
-        
-        if (publicFilesOnly) {
-            if (hasContent) sb.append(", ");
-            sb.append("publicFilesOnly");
-            hasContent = true;
+        if (fileQuery != null) {
+            sb.append("fileQuery=").append(fileQuery);
+        } else {
+            sb.append("fileQuery=<default>");
         }
-        
-        if (offset > 0 || length > 0) {
-            if (hasContent) sb.append(", ");
-            sb.append("offset=").append(offset);
-            sb.append(", length=").append(length == 0 ? "unlimited" : length);
-            hasContent = true;
-        }
-        
-        if (!hasContent) {
-            sb.append("defaults");
-        }
-        
         sb.append("}");
         return sb.toString();
     }
