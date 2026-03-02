@@ -167,28 +167,6 @@ public interface ExportDataProvider {
      *             or {@link #getDatasetFileDetails(FileExportQuery, PageRequest)}instead.
      */
     @Deprecated(since = "2.1.0", forRemoval = true)
-    
-    /**
-     * Returns detailed metadata for tabular files only, with support for filtering and pagination.
-     * <p>
-     * This method is specifically designed for datasets with large numbers of tabular
-     * files and data variables. It provides access to the complete hierarchy of
-     * datafile → filemetadata → datatable → datavariable metadata.
-     *
-     * @param context configuration for data retrieval
-     * @return JSON array containing metadata for tabular files only
-     * @throws ExportException if metadata retrieval fails
-     * @throws NullPointerException if context is null
-     * @since 2.1.0
-     * @apiNote Pagination is intended for retrieving specific subsets, not for iterating
-     *          through large result sets. For complete exports, call once without pagination
-     *          or iterate by checking for empty results.
-     * @implNote Implementations should respect {@code publicFilesOnly} to filter restricted
-     *           or embargoed files. Pagination via {@code offset} and {@code length} should
-     *           be supported where feasible. The {@code datasetMetadataOnly} flag does not
-     *           apply and should be ignored.
-     */
-    JsonArray getTabularDataDetails(ExportDataContext context);
     JsonArray getDatasetFileDetails();
     
     /**
