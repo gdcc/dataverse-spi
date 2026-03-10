@@ -304,7 +304,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         Set<TypeElement> contracts = collectImplementedContracts(implementation);
         if (contracts.isEmpty()) {
-            error(implementation, "No implemented plugin contracts found. Did you annotate with @PluginContract?");
+            error(
+                implementation,
+                "No implemented plugin contracts found; implementations must implement a specific @PluginContract interface"
+            );
             throw new ProcessorException();
         }
         
@@ -496,6 +499,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     private void inspectType(TypeElement typeElement) {
         validatePluginContractUsage(typeElement);
+        validateDirectBaseTypeImplementations(typeElement);
         
         if (isPluginInterfaceCandidate(typeElement)) {
             if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
@@ -522,6 +526,59 @@ public final class PluginContractProcessor extends AbstractProcessor {
             // authors remembering one annotation.
             processImplementation(typeElement);
         }
+    }
+    
+    /**
+     * Rejects direct implementations of the foundational base types {@code Plugin} and
+     * {@code CoreProvider}.
+     *
+     * <p>These two types are infrastructure-level marker/base interfaces only. Loadable plugins
+     * and concrete providers must instead implement a specific contract interface extending one
+     * of these base types. Otherwise, no meaningful compatibility contract can be derived.</p>
+     *
+     * @param typeElement the type currently being inspected
+     */
+    private void validateDirectBaseTypeImplementations(TypeElement typeElement) {
+        if (typeElement.getKind() != ElementKind.CLASS) {
+            return;
+        }
+        
+        if (directlyImplementsType(typeElement, PLUGIN_INTERFACE)) {
+            error(
+                typeElement,
+                "Plugin implementations must implement a specific plugin contract interface, not Plugin directly"
+            );
+            throw new ProcessorException();
+        }
+        
+        if (directlyImplementsType(typeElement, CORE_PROVIDER_INTERFACE)) {
+            error(
+                typeElement,
+                "Core provider implementations must implement a specific provider interface, not CoreProvider directly"
+            );
+            throw new ProcessorException();
+        }
+    }
+    
+    /**
+     * Checks whether a type directly declares the given interface in its {@code implements} clause.
+     *
+     * <p>This is stricter than assignability: it only matches explicit direct implementation and is
+     * used to reject classes that target the framework base interfaces {@code Plugin} or
+     * {@code CoreProvider} directly.</p>
+     *
+     * @param typeElement the type to inspect
+     * @param targetTypeName the fully qualified interface name to look for
+     * @return {@code true} if the type directly implements the target interface
+     */
+    private boolean directlyImplementsType(TypeElement typeElement, String targetTypeName) {
+        for (TypeMirror interfaceType : typeElement.getInterfaces()) {
+            TypeElement interfaceElement = asTypeElement(interfaceType);
+            if (interfaceElement != null && interfaceElement.getQualifiedName().contentEquals(targetTypeName)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**

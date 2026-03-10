@@ -625,7 +625,7 @@ class PluginContractProcessorTest {
             ));
             
             assertFalse(result.success(), "Compilation should fail");
-            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "exactly one base plugin contract");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "exactly one Kind.BASE @PluginContract");
         }
         
         @Test
@@ -650,6 +650,39 @@ class PluginContractProcessorTest {
             
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "No implemented plugin contracts found");
+        }
+        
+        @Test
+        void failsWhenImplementationDirectlyImplementsPlugin() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/RawPluginImpl.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class RawPluginImpl implements Plugin {
+                            @Override
+                            public String identity() {
+                                return "raw-plugin";
+                            }
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        DataversePlugin.class.getCanonicalName()
+                    )
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(
+                result,
+                Diagnostic.Kind.ERROR,
+                "must implement a specific plugin contract interface, not Plugin directly"
+            );
         }
         
         @Test
@@ -817,6 +850,7 @@ class PluginContractProcessorTest {
         }
         
         @Test
+        // because we want to allow base classes, as long as concrete classes are annotated @DataversePlugin
         void doesNotWarnForAbstractUnannotatedPluginBaseClass() throws IOException {
             ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
                 source(
