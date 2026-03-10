@@ -304,7 +304,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         Set<TypeElement> contracts = collectImplementedContracts(implementation);
         if (contracts.isEmpty()) {
-            error(implementation, "No implemented plugin contracts found");
+            error(implementation, "No implemented plugin contracts found. Did you annotate with @PluginContract?");
             throw new ProcessorException();
         }
         
@@ -342,7 +342,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
         
         if (baseContract == null) {
-            error(implementation, "Implementation must implement exactly one base plugin contract");
+            error(implementation, "Implementation must implement exactly one Kind.BASE @PluginContract");
             throw new ProcessorException();
         }
         
@@ -387,12 +387,12 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
         
         if (!implementation.getModifiers().contains(Modifier.PUBLIC)) {
-            error(implementation, "Dataverse plugin implementations must be public");
+            error(implementation, "@DataversePlugin implementations must be public");
             throw new ProcessorException();
         }
         
         if (implementation.getModifiers().contains(Modifier.ABSTRACT)) {
-            error(implementation, "Dataverse plugin implementations must not be abstract");
+            error(implementation, "@DataversePlugin implementations must not be abstract");
             throw new ProcessorException();
         }
     }
