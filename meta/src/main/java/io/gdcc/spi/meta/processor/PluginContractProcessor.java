@@ -161,6 +161,24 @@ public final class PluginContractProcessor extends AbstractProcessor {
     private final Set<String> serviceTypesManagedExternally = new LinkedHashSet<>();
     
     /**
+     * Types already inspected during the current compilation.
+     *
+     * <p>The processor performs additional model-wide validation beyond explicit {@code @DataversePlugin}
+     * usages. Since the same type may reappear through multiple roots or hierarchy traversals, this set
+     * keeps those checks idempotent and avoids duplicate diagnostics.</p>
+     */
+    private final Set<String> inspectedTypes = new LinkedHashSet<>();
+    
+    /**
+     * Plugin implementations already converted into generated output models.
+     *
+     * <p>This is needed because implementations may be processed either explicitly through
+     * {@code @DataversePlugin} or implicitly when they are discovered as plain {@code Plugin}
+     * implementations during hierarchy inspection.</p>
+     */
+    private final Set<String> processedImplementations = new LinkedHashSet<>();
+    
+    /**
      * Initializes compiler utility helpers from the processing environment.
      *
      * @param processingEnv the active annotation processing environment
@@ -175,14 +193,15 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Returns the annotation types directly claimed by this processor.
      *
-     * <p>The processor only claims {@code @DataversePlugin}. Other annotations are read while
-     * traversing the type model of such implementations.</p>
+     * <p>The processor claims all annotations because it does not only react to explicitly annotated
+     * {@code @DataversePlugin} classes. It also performs project-wide validation for plugin contracts,
+     * provider contracts, and unannotated plugin implementations discovered in the type model.</p>
      *
      * @return the supported top-level annotation types
      */
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        return Set.of(PLUGIN_IMPLEMENTATION_ANNOTATION);
+        return Set.of("*");
     }
     
     /**
@@ -201,13 +220,18 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Main processor entry point for each annotation processing round.
      *
-     * <p>During normal rounds, all {@code @DataversePlugin} classes are validated and converted
-     * into in-memory descriptor/service models. During the final round, those accumulated models are
-     * written to the compiler output.</p>
+     * <p>During normal rounds, this processor performs two tasks:</p>
+     * <ol>
+     *   <li>it inspects all root types and their hierarchies for project-wide contract validation,</li>
+     *   <li>it processes explicitly annotated {@code @DataversePlugin} classes.</li>
+     * </ol>
+     *
+     * <p>During the final round, all accumulated descriptor and service models are written to the
+     * compiler output.</p>
      *
      * @param annotations the annotations requested for this round
      * @param roundEnv the current round environment
-     * @return {@code true}, because this processor claims the handled annotation
+     * @return {@code false} so other processors may continue to participate normally
      */
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -216,6 +240,20 @@ public final class PluginContractProcessor extends AbstractProcessor {
             // If the marker annotation itself cannot be resolved, something is wrong with the
             // processor classpath. Returning false leaves room for other processors to continue.
             return false;
+        }
+        
+        // Inspect all roots, not just annotated types. This enables strict enforcement for
+        // plugin/provider contracts and lets us discover plain Plugin implementations that
+        // should have used @DataversePlugin.
+        for (Element root : roundEnv.getRootElements()) {
+            if (root instanceof TypeElement typeElement) {
+                try {
+                    inspectTypeHierarchy(typeElement);
+                } catch (ProcessorException ignored) {
+                    // The concrete error has already been reported with source location.
+                    // Continue with remaining roots to surface as many problems as possible.
+                }
+            }
         }
         
         for (Element element : roundEnv.getElementsAnnotatedWith(markerAnnotation)) {
@@ -236,7 +274,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
             writeAllGeneratedResources();
         }
         
-        return true;
+        return false;
     }
     
     /**
@@ -255,6 +293,13 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @param implementation the plugin implementation class
      */
     private void processImplementation(TypeElement implementation) {
+        String implementationClassName = implementation.getQualifiedName().toString();
+        if (!processedImplementations.add(implementationClassName)) {
+            // The implementation was already processed earlier in this compilation, for example
+            // when discovered implicitly during type hierarchy inspection.
+            return;
+        }
+        
         validateImplementationClass(implementation);
         
         Set<TypeElement> contracts = collectImplementedContracts(implementation);
@@ -301,7 +346,6 @@ public final class PluginContractProcessor extends AbstractProcessor {
             throw new ProcessorException();
         }
         
-        String implementationClassName = implementation.getQualifiedName().toString();
         String baseContractName = baseContract.getQualifiedName().toString();
         
         descriptors.put(
@@ -402,6 +446,150 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
         
         return result;
+    }
+    
+    /**
+     * Traverses a type hierarchy and applies project-wide validation rules.
+     *
+     * <p>This method exists because the processor validates more than explicitly annotated
+     * implementations. It also enforces that:</p>
+     * <ul>
+     *   <li>plugin interfaces carry {@code @PluginContract},</li>
+     *   <li>provider interfaces declare {@code API_LEVEL},</li>
+     *   <li>concrete plugin implementations use {@code @DataversePlugin}, or at least trigger a warning.</li>
+     * </ul>
+     *
+     * @param typeElement the root type to inspect
+     */
+    private void inspectTypeHierarchy(TypeElement typeElement) {
+        Deque<TypeElement> queue = new ArrayDeque<>();
+        queue.addLast(typeElement);
+        
+        while (!queue.isEmpty()) {
+            TypeElement current = queue.removeFirst();
+            String qualifiedName = current.getQualifiedName().toString();
+            if (!inspectedTypes.add(qualifiedName)) {
+                continue;
+            }
+            
+            inspectType(current);
+            
+            for (TypeMirror iface : current.getInterfaces()) {
+                TypeElement interfaceType = asTypeElement(iface);
+                if (interfaceType != null) {
+                    queue.addLast(interfaceType);
+                }
+            }
+            
+            TypeMirror superclass = current.getSuperclass();
+            TypeElement superType = asTypeElement(superclass);
+            if (superType != null && superclass.getKind() != TypeKind.NONE) {
+                queue.addLast(superType);
+            }
+        }
+    }
+    
+    /**
+     * Applies validation rules to a single type discovered during hierarchy inspection.
+     *
+     * @param typeElement the type to inspect
+     */
+    private void inspectType(TypeElement typeElement) {
+        if (isPluginInterfaceCandidate(typeElement)) {
+            if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
+                error(typeElement, "Plugin interfaces must declare @PluginContract");
+                throw new ProcessorException();
+            }
+            
+            validateApiLevelConstant(typeElement);
+        }
+        
+        if (isProviderInterfaceCandidate(typeElement)) {
+            validateApiLevelConstant(typeElement);
+        }
+        
+        if (isPluginImplementationCandidate(typeElement)
+            && findAnnotationMirror(typeElement, PLUGIN_IMPLEMENTATION_ANNOTATION) == null) {
+            warning(
+                typeElement,
+                "Plugin implementation should declare @DataversePlugin; processing it implicitly"
+            );
+            
+            // Even without the annotation, we still process the implementation. This keeps the
+            // migration path smooth and ensures metadata generation does not depend solely on
+            // authors remembering one annotation.
+            processImplementation(typeElement);
+        }
+    }
+    
+    /**
+     * Determines whether a type qualifies as an implementation candidate for a plugin.
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is a concrete class implementing {@code Plugin}
+     */
+    private boolean isPluginImplementationCandidate(TypeElement typeElement) {
+        if (typeElement.getKind() != ElementKind.CLASS) {
+            return false;
+        }
+        if (typeElement.getModifiers().contains(Modifier.ABSTRACT)) {
+            return false;
+        }
+        return implementsType(typeElement, PLUGIN_INTERFACE) && !isExactType(typeElement, PLUGIN_INTERFACE);
+    }
+    
+    /**
+     * Determines whether a type is a plugin interface candidate that must declare {@code @PluginContract}.
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is an interface extending {@code Plugin}
+     */
+    private boolean isPluginInterfaceCandidate(TypeElement typeElement) {
+        return typeElement.getKind() == ElementKind.INTERFACE
+            && implementsType(typeElement, PLUGIN_INTERFACE)
+            && !isExactType(typeElement, PLUGIN_INTERFACE);
+    }
+    
+    /**
+     * Determines whether a type is a provider interface candidate that must declare {@code API_LEVEL}.
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is an interface extending {@code CoreProvider}
+     */
+    private boolean isProviderInterfaceCandidate(TypeElement typeElement) {
+        return typeElement.getKind() == ElementKind.INTERFACE
+            && implementsType(typeElement, CORE_PROVIDER_INTERFACE)
+            && !isExactType(typeElement, CORE_PROVIDER_INTERFACE);
+    }
+    
+    /**
+     * Tests whether the given type is assignable to another type identified by fully qualified name.
+     *
+     * @param typeElement the source type
+     * @param targetTypeName the fully qualified target type name
+     * @return {@code true} if the source type is assignable to the target type
+     */
+    private boolean implementsType(TypeElement typeElement, String targetTypeName) {
+        TypeElement targetType = elements.getTypeElement(targetTypeName);
+        if (targetType == null) {
+            return false;
+        }
+        
+        return types.isAssignable(
+            types.erasure(typeElement.asType()),
+            types.erasure(targetType.asType())
+        );
+    }
+    
+    /**
+     * Checks whether the given type is exactly the named type itself, not merely a subtype.
+     *
+     * @param typeElement the type to inspect
+     * @param targetTypeName the fully qualified target type name
+     * @return {@code true} if both names are identical
+     */
+    private boolean isExactType(TypeElement typeElement, String targetTypeName) {
+        return typeElement.getQualifiedName().contentEquals(targetTypeName);
     }
     
     /**

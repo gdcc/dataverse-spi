@@ -1,7 +1,7 @@
 package io.gdcc.spi.meta.processor;
 
-import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.annotations.DataversePlugin;
+import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.annotations.RequiredProvider;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import io.gdcc.spi.meta.plugin.Plugin;
@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PluginContractProcessorTest {
     
@@ -94,6 +96,135 @@ class PluginContractProcessorTest {
             
             String serviceFile = Files.readString(result.generatedFile(servicePath));
             assertEquals("test.GoodPlugin", serviceFile.trim());
+        }
+        
+        @Test
+        void warnsWhenPluginImplementationOmitsDataversePluginAnnotation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 2;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/ImplicitPlugin.java",
+                    """
+                        package test;
+                    
+                        public class ImplicitPlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "implicit";
+                            }
+                        }
+                        """
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            assertDiagnosticContains(result, Diagnostic.Kind.WARNING, "@DataversePlugin");
+        }
+        
+        @Test
+        void createsDescriptorEvenWhenPluginImplementationOmitsDataversePluginAnnotation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 4;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/ImplicitPlugin.java",
+                    """
+                        package test;
+                    
+                        public class ImplicitPlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "implicit";
+                            }
+                        }
+                        """
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            
+            String descriptorPath = "META-INF/dataverse/plugins/test_ImplicitPlugin.properties";
+            assertTrue(Files.exists(result.generatedFile(descriptorPath)), "Descriptor should still be generated");
+            
+            String descriptor = Files.readString(result.generatedFile(descriptorPath));
+            assertTrue(descriptor.contains("plugin.class=test.ImplicitPlugin"));
+            assertTrue(descriptor.contains("plugin.kind=test.TestPlugin"));
+            assertTrue(descriptor.contains("plugin.test.TestPlugin.level=4"));
+        }
+        
+        @Test
+        void createsServiceFileEvenWhenPluginImplementationOmitsDataversePluginAnnotation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 5;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/ImplicitPlugin.java",
+                    """
+                        package test;
+                    
+                        public class ImplicitPlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "implicit";
+                            }
+                        }
+                        """
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            
+            String servicePath = "META-INF/services/test.TestPlugin";
+            assertTrue(Files.exists(result.generatedFile(servicePath)), "Service file should still be generated");
+            
+            String serviceFile = Files.readString(result.generatedFile(servicePath));
+            assertEquals("test.ImplicitPlugin", serviceFile.trim());
         }
         
         @Test
@@ -217,6 +348,43 @@ class PluginContractProcessorTest {
             
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "also requires contract test.BasePlugin");
+        }
+        
+        @Test
+        void failsWhenPluginInterfaceLacksPluginContractAnnotation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/UndeclaredPluginContract.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        public interface UndeclaredPluginContract extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(Plugin.class.getCanonicalName())
+                ),
+                source(
+                    "test/UndeclaredPluginImpl.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class UndeclaredPluginImpl implements UndeclaredPluginContract {
+                            @Override
+                            public String identity() {
+                                return "undeclared-contract";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "Plugin interfaces must declare @PluginContract");
         }
         
         @Test
@@ -411,6 +579,387 @@ class PluginContractProcessorTest {
             
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "exactly one base plugin contract");
+        }
+        
+        @Test
+        void failsWhenDataversePluginAnnotatedClassIsNotAPluginImplementation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/NotAPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class NotAPlugin {
+                            public String identity() {
+                                return "not-a-plugin";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "No implemented plugin contracts found");
+        }
+        
+        @Test
+        void doesNotProcessAnnotatedImplementationTwice() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 6;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/OncePlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class OncePlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "once";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            
+            String servicePath = "META-INF/services/test.TestPlugin";
+            assertTrue(Files.exists(result.generatedFile(servicePath)), "Service file should be generated");
+            
+            List<String> lines = Files.readAllLines(result.generatedFile(servicePath))
+                .stream()
+                .filter(line -> !line.isBlank())
+                .toList();
+            
+            assertEquals(1, lines.size(), "Implementation should only be registered once");
+            assertEquals("test.OncePlugin", lines.get(0));
+        }
+        
+        @Test
+        void aggregatesMultipleImplementationsIntoOneServiceFile() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/APlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class APlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "a";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                ),
+                source(
+                    "test/BPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class BPlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "b";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            
+            String servicePath = "META-INF/services/test.TestPlugin";
+            assertTrue(Files.exists(result.generatedFile(servicePath)), "Aggregated service file should be generated");
+            
+            List<String> lines = Files.readAllLines(result.generatedFile(servicePath))
+                .stream()
+                .filter(line -> !line.isBlank())
+                .toList();
+            
+            assertEquals(List.of("test.APlugin", "test.BPlugin"), lines);
+        }
+        
+        @Test
+        void compilesWhenAnnotatedPluginInterfaceHasNoImplementation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/LonelyPluginContract.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface LonelyPluginContract extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+        }
+        
+        @Test
+        void compilesWhenUnusedProviderInterfaceHasApiLevel() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/LonelyProvider.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        public interface LonelyProvider extends CoreProvider {
+                            int API_LEVEL = 42;
+                        }
+                        """.formatted(CoreProvider.class.getCanonicalName())
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+        }
+        
+        @Test
+        void doesNotWarnForAbstractUnannotatedPluginBaseClass() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/AbstractBasePlugin.java",
+                    """
+                        package test;
+                    
+                        public abstract class AbstractBasePlugin implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "base";
+                            }
+                        }
+                        """
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            assertDiagnosticDoesNotContain(result, Diagnostic.Kind.WARNING, "@DataversePlugin");
+        }
+        
+        @Test
+        void failsWhenIndirectPluginInterfaceLacksPluginContractAnnotation() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/BasePlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface BasePlugin extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/DerivedPlugin.java",
+                    """
+                        package test;
+                    
+                        public interface DerivedPlugin extends BasePlugin {
+                            int API_LEVEL = 2;
+                        }
+                        """
+                ),
+                source(
+                    "test/DerivedPluginImpl.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class DerivedPluginImpl implements DerivedPlugin {
+                            @Override
+                            public String identity() {
+                                return "derived";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "Plugin interfaces must declare @PluginContract");
+        }
+        
+        @Test
+        void suppressesServiceGenerationOnlyForPluginKindManagedByAutoService() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "com/google/auto/service/AutoService.java",
+                    """
+                        package com.google.auto.service;
+                    
+                        import java.lang.annotation.ElementType;
+                        import java.lang.annotation.Retention;
+                        import java.lang.annotation.RetentionPolicy;
+                        import java.lang.annotation.Target;
+                    
+                        @Retention(RetentionPolicy.RUNTIME)
+                        @Target(ElementType.TYPE)
+                        public @interface AutoService {
+                            Class<?>[] value();
+                        }
+                        """
+                ),
+                source(
+                    "test/PluginTypeA.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface PluginTypeA extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/PluginTypeB.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface PluginTypeB extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/AutoManagedA.java",
+                    """
+                        package test;
+                    
+                        import com.google.auto.service.AutoService;
+                        import %s;
+                    
+                        @DataversePlugin
+                        @AutoService(PluginTypeA.class)
+                        public class AutoManagedA implements PluginTypeA {
+                            @Override
+                            public String identity() {
+                                return "a";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                ),
+                source(
+                    "test/NormalB.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                    
+                        @DataversePlugin
+                        public class NormalB implements PluginTypeB {
+                            @Override
+                            public String identity() {
+                                return "b";
+                            }
+                        }
+                        """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertTrue(result.success(), result.diagnosticsAsText());
+            
+            String servicePathA = "META-INF/services/test.PluginTypeA";
+            String servicePathB = "META-INF/services/test.PluginTypeB";
+            
+            assertFalse(Files.exists(result.generatedFile(servicePathA)), "PluginTypeA service file should be suppressed");
+            assertTrue(Files.exists(result.generatedFile(servicePathB)), "PluginTypeB service file should still be generated");
+            
+            String serviceFileB = Files.readString(result.generatedFile(servicePathB));
+            assertEquals("test.NormalB", serviceFileB.trim());
         }
     }
     
@@ -970,6 +1519,11 @@ class PluginContractProcessorTest {
             String descriptor = Files.readString(result.generatedFile(descriptorPath));
             
             assertTrue(descriptor.contains("plugin.requires.test.SharedProvider.level=8"));
+            assertEquals(
+                1,
+                countOccurrences(descriptor, "plugin.requires.test.SharedProvider.level=8"),
+                "Shared provider should only appear once in the descriptor"
+            );
         }
     }
     
@@ -991,5 +1545,31 @@ class PluginContractProcessorTest {
             found,
             () -> "Expected diagnostic containing '%s' but got:%n%s".formatted(fragment, result.diagnosticsAsText())
         );
+    }
+    
+    private static void assertDiagnosticDoesNotContain(
+        ProcessorTestCompiler.CompilationResult result,
+        Diagnostic.Kind kind,
+        String fragment
+    ) {
+        boolean found = result.diagnostics().stream()
+            .filter(diagnostic -> diagnostic.getKind() == kind)
+            .map(diagnostic -> diagnostic.getMessage(null))
+            .anyMatch(message -> message.contains(fragment));
+        
+        assertFalse(
+            found,
+            () -> "Did not expect diagnostic containing '%s' but got:%n%s".formatted(fragment, result.diagnosticsAsText())
+        );
+    }
+    
+    private static int countOccurrences(String text, String fragment) {
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(fragment, index)) >= 0) {
+            count++;
+            index += fragment.length();
+        }
+        return count;
     }
 }
