@@ -99,6 +99,53 @@ class PluginContractProcessorTest {
         }
         
         @Test
+        void failsWhenPluginContractIsPlacedOnImplementationClass() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/TestPlugin.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public interface TestPlugin extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/InvalidImplementation.java",
+                    """
+                        package test;
+                    
+                        import %s;
+                        import %s;
+                    
+                        @DataversePlugin
+                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        public class InvalidImplementation implements TestPlugin {
+                            @Override
+                            public String identity() {
+                                return "invalid";
+                            }
+                        }
+                        """.formatted(
+                        DataversePlugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "@PluginContract may only be declared on interfaces");
+        }
+        
+        @Test
         void warnsWhenPluginImplementationOmitsDataversePluginAnnotation() throws IOException {
             ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
                 source(

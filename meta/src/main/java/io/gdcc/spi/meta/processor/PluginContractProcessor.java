@@ -495,6 +495,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @param typeElement the type to inspect
      */
     private void inspectType(TypeElement typeElement) {
+        validatePluginContractUsage(typeElement);
+        
         if (isPluginInterfaceCandidate(typeElement)) {
             if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
                 error(typeElement, "Plugin interfaces must declare @PluginContract");
@@ -590,6 +592,27 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     private boolean isExactType(TypeElement typeElement, String targetTypeName) {
         return typeElement.getQualifiedName().contentEquals(targetTypeName);
+    }
+    
+    /**
+     * Verifies that {@code @PluginContract} is only used on interfaces.
+     *
+     * <p>Although the annotation is intended for SPI interfaces, Java's annotation target model
+     * cannot express "interfaces only". This processor therefore enforces the rule explicitly and
+     * fails compilation when the annotation is placed on classes, enums, records, or other
+     * non-interface types.</p>
+     *
+     * @param typeElement the type currently being inspected
+     */
+    private void validatePluginContractUsage(TypeElement typeElement) {
+        if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
+            return;
+        }
+        
+        if (typeElement.getKind() != ElementKind.INTERFACE) {
+            error(typeElement, "@PluginContract may only be declared on interfaces");
+            throw new ProcessorException();
+        }
     }
     
     /**
