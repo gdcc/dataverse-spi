@@ -3,6 +3,8 @@ package io.gdcc.spi.meta.processor;
 import io.gdcc.spi.meta.annotations.DataversePlugin;
 import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.annotations.RequiredProvider;
+import io.gdcc.spi.meta.descriptor.PluginDescriptor;
+import io.gdcc.spi.meta.descriptor.PluginDescriptorFormat;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import io.gdcc.spi.meta.plugin.Plugin;
 import org.junit.jupiter.api.Nested;
@@ -82,17 +84,17 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String descriptorPath = "META-INF/dataverse/plugins/test_GoodPlugin.properties";
+            String descriptorPath = PluginDescriptorFormat.toPath("test.GoodPlugin");
             String servicePath = "META-INF/services/test.TestPlugin";
             
             assertTrue(Files.exists(result.generatedFile(descriptorPath)), "Descriptor should be generated");
             assertTrue(Files.exists(result.generatedFile(servicePath)), "Service file should be generated");
             
-            String descriptor = Files.readString(result.generatedFile(descriptorPath));
-            assertTrue(descriptor.contains("plugin.class=test.GoodPlugin"));
-            assertTrue(descriptor.contains("plugin.kind=test.TestPlugin"));
-            assertTrue(descriptor.contains("plugin.test.TestPlugin.level=3"));
-            assertTrue(descriptor.contains("plugin.requires.test.TestProvider.level=7"));
+            PluginDescriptor descriptor = PluginDescriptorFormat.read(Files.readString(result.generatedFile(descriptorPath)));
+            assertEquals("test.GoodPlugin", descriptor.pluginClass());
+            assertEquals("test.TestPlugin", descriptor.pluginKind());
+            assertEquals(3, descriptor.contractLevel("test.TestPlugin").getAsInt());
+            assertEquals(7, descriptor.requiredProviderLevel("test.TestProvider").getAsInt());
             
             String serviceFile = Files.readString(result.generatedFile(servicePath));
             assertEquals("test.GoodPlugin", serviceFile.trim());
@@ -221,13 +223,13 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String descriptorPath = "META-INF/dataverse/plugins/test_ImplicitPlugin.properties";
+            String descriptorPath = PluginDescriptorFormat.toPath("test.ImplicitPlugin");
             assertTrue(Files.exists(result.generatedFile(descriptorPath)), "Descriptor should still be generated");
             
-            String descriptor = Files.readString(result.generatedFile(descriptorPath));
-            assertTrue(descriptor.contains("plugin.class=test.ImplicitPlugin"));
-            assertTrue(descriptor.contains("plugin.kind=test.TestPlugin"));
-            assertTrue(descriptor.contains("plugin.test.TestPlugin.level=4"));
+            PluginDescriptor descriptor = PluginDescriptorFormat.read(Files.readString(result.generatedFile(descriptorPath)));
+            assertEquals("test.ImplicitPlugin", descriptor.pluginClass());
+            assertEquals("test.TestPlugin", descriptor.pluginKind());
+            assertEquals(4, descriptor.contractLevel("test.TestPlugin").getAsInt());
         }
         
         @Test
@@ -493,7 +495,7 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String descriptorPath = "META-INF/dataverse/plugins/test_AutoServicePlugin.properties";
+            String descriptorPath = PluginDescriptorFormat.toPath("test.AutoServicePlugin");
             String servicePath = "META-INF/services/test.TestPlugin";
             
             assertTrue(Files.exists(result.generatedFile(descriptorPath)), "Descriptor should still be generated");
@@ -1400,16 +1402,16 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String descriptorPath = "META-INF/dataverse/plugins/test_TransitiveImpl.properties";
+            String descriptorPath = PluginDescriptorFormat.toPath("test.TransitiveImpl");
             assertTrue(Files.exists(result.generatedFile(descriptorPath)), "Descriptor should be generated");
             
-            String descriptor = Files.readString(result.generatedFile(descriptorPath));
-            assertTrue(descriptor.contains("plugin.class=test.TransitiveImpl"));
-            assertTrue(descriptor.contains("plugin.kind=test.BasePlugin"));
-            assertTrue(descriptor.contains("plugin.test.BasePlugin.level=3"));
-            assertTrue(descriptor.contains("plugin.test.IntermediateCapability.level=4"));
-            assertTrue(descriptor.contains("plugin.test.LeafCapability.level=5"));
-            assertTrue(descriptor.contains("plugin.requires.test.TestProvider.level=11"));
+            PluginDescriptor descriptor = PluginDescriptorFormat.read(Files.readString(result.generatedFile(descriptorPath)));
+            assertEquals("test.TransitiveImpl", descriptor.pluginClass());
+            assertEquals("test.BasePlugin", descriptor.pluginKind());
+            assertEquals(3, descriptor.contractLevel("test.BasePlugin").getAsInt());
+            assertEquals(4, descriptor.contractLevel("test.IntermediateCapability").getAsInt());
+            assertEquals(5, descriptor.contractLevel("test.LeafCapability").getAsInt());
+            assertEquals(11, descriptor.requiredProviderLevel("test.TestProvider").getAsInt());
         }
         
         @Test
@@ -1487,8 +1489,8 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String autoDescriptorPath = "META-INF/dataverse/plugins/test_AutoServiceImpl.properties";
-            String normalDescriptorPath = "META-INF/dataverse/plugins/test_NormalImpl.properties";
+            String autoDescriptorPath = PluginDescriptorFormat.toPath("test.AutoServiceImpl");
+            String normalDescriptorPath = PluginDescriptorFormat.toPath("test.NormalImpl");
             String servicePath = "META-INF/services/test.TestPlugin";
             
             assertTrue(Files.exists(result.generatedFile(autoDescriptorPath)), "AutoService descriptor should be generated");
@@ -1596,15 +1598,9 @@ class PluginContractProcessorTest {
             
             assertTrue(result.success(), result.diagnosticsAsText());
             
-            String descriptorPath = "META-INF/dataverse/plugins/test_MergedProviderImpl.properties";
-            String descriptor = Files.readString(result.generatedFile(descriptorPath));
-            
-            assertTrue(descriptor.contains("plugin.requires.test.SharedProvider.level=8"));
-            assertEquals(
-                1,
-                countOccurrences(descriptor, "plugin.requires.test.SharedProvider.level=8"),
-                "Shared provider should only appear once in the descriptor"
-            );
+            String descriptorPath = PluginDescriptorFormat.toPath("test.MergedProviderImpl");
+            PluginDescriptor descriptor = PluginDescriptorFormat.read(Files.readString(result.generatedFile(descriptorPath)));
+            assertEquals(8, descriptor.requiredProviderLevel("test.SharedProvider").getAsInt());
         }
     }
     

@@ -1,6 +1,8 @@
 package io.gdcc.spi.meta.processor;
 
 import io.gdcc.spi.meta.annotations.PluginContract;
+import io.gdcc.spi.meta.descriptor.PluginDescriptor;
+import io.gdcc.spi.meta.descriptor.PluginDescriptorFormat;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -32,7 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -141,7 +142,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * <p>Descriptors are written only after processing is over, which keeps resource generation
      * deterministic and avoids partial aggregate state.</p>
      */
-    private final Map<String, GeneratedDescriptorModel> descriptors = new LinkedHashMap<>();
+    private final Map<String, PluginDescriptor> descriptors = new LinkedHashMap<>();
     
     /**
      * Service registrations grouped by base contract name.
@@ -336,7 +337,14 @@ public final class PluginContractProcessor extends AbstractProcessor {
             // contract interface visible during this compilation. This preserves the build-time
             // contract snapshot we later need at runtime.
             int contractApiLevel = readIntConstant(contract, API_LEVEL_FIELD);
-            contractLevels.put(contract.getQualifiedName().toString(), contractApiLevel);
+            String contractFQCN = contract.getQualifiedName().toString();
+            // The following is just a precaution. As we look into these during compile time, it's hard to imagine
+            // a scenario where the levels ever actually differ.
+            if (contractLevels.containsKey(contractFQCN) && contractLevels.get(contractFQCN) != contractApiLevel) {
+                error(implementation, "Conflicting API levels on contract implementation: " + contractFQCN);
+            } else {
+                contractLevels.put(contract.getQualifiedName().toString(), contractApiLevel);
+            }
             
             // Provider requirements accumulate across all implemented contracts/capabilities.
             // Conflicting requirements are rejected below.
@@ -353,11 +361,11 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         descriptors.put(
             implementationClassName,
-            new GeneratedDescriptorModel(
+            new PluginDescriptor(
                 implementationClassName,
                 baseContractName,
-                Map.copyOf(contractLevels),
-                Map.copyOf(providerLevels)
+                contractLevels,
+                providerLevels
             )
         );
         
@@ -893,7 +901,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * are not externally managed via {@code @AutoService}.</p>
      */
     private void writeAllGeneratedResources() {
-        for (GeneratedDescriptorModel descriptor : descriptors.values()) {
+        for (PluginDescriptor descriptor : descriptors.values()) {
             writeDescriptor(descriptor);
         }
         
@@ -911,25 +919,16 @@ public final class PluginContractProcessor extends AbstractProcessor {
      *
      * @param descriptor the descriptor model to serialize
      */
-    private void writeDescriptor(GeneratedDescriptorModel descriptor) {
-        String resourceName = DESCRIPTOR_DIRECTORY + descriptor.pluginClass().replace('.', '_') + ".properties";
+    private void writeDescriptor(PluginDescriptor descriptor) {
+        String resourceName = PluginDescriptorFormat.toPath(descriptor.pluginClass());
         
         try {
-            FileObject resource = processingEnv.getFiler()
+            FileObject resource = processingEnv
+                .getFiler()
                 .createResource(StandardLocation.CLASS_OUTPUT, "", resourceName);
             
-            Properties properties = new Properties();
-            properties.setProperty("plugin.class", descriptor.pluginClass());
-            properties.setProperty("plugin.kind", descriptor.pluginKind());
-            
-            descriptor.contracts().forEach((contract, level) ->
-                properties.setProperty("plugin." + contract + ".level", Integer.toString(level)));
-            
-            descriptor.requiredProviders().forEach((provider, level) ->
-                properties.setProperty("plugin.requires." + provider + ".level", Integer.toString(level)));
-            
             try (Writer writer = resource.openWriter()) {
-                properties.store(writer, "Generated plugin contract metadata");
+                PluginDescriptorFormat.write(descriptor, writer);
             }
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(
@@ -941,6 +940,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Writes one ServiceLoader registration file for a base contract.
+     * This is simply a re-implementation of what we did before with @AutoService and their processor
      *
      * @param serviceTypeName the fully qualified name of the service interface
      * @param implementations the implementation class names to register
@@ -1159,22 +1159,6 @@ public final class PluginContractProcessor extends AbstractProcessor {
         PluginContract.Kind kind,
         List<TypeElement> requiredContracts,
         List<TypeElement> providers
-    ) {
-    }
-    
-    /**
-     * Internal in-memory representation of one generated plugin descriptor.
-     *
-     * @param pluginClass implementation class name
-     * @param pluginKind fully qualified base contract name
-     * @param contracts map of implemented contract names to API levels
-     * @param requiredProviders map of required provider names to API levels
-     */
-    private record GeneratedDescriptorModel(
-        String pluginClass,
-        String pluginKind,
-        Map<String, Integer> contracts,
-        Map<String, Integer> requiredProviders
     ) {
     }
     
