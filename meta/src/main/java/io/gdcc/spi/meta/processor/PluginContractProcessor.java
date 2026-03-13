@@ -319,7 +319,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         for (TypeElement contract : sortByQualifiedName(contracts)) {
             PluginContractModel model = readPluginContractModel(contract);
             
-            if (model.kind() == PluginContract.Kind.BASE) {
+            if (model.role() == PluginContract.Role.BASE) {
                 if (baseContract != null) {
                     error(
                         implementation,
@@ -353,7 +353,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
         
         if (baseContract == null) {
-            error(implementation, "Implementation must implement exactly one Kind.BASE @PluginContract");
+            error(implementation, "Implementation must implement exactly one Role.BASE @PluginContract");
             throw new ProcessorException();
         }
         
@@ -720,37 +720,37 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         validateApiLevelConstant(contract);
         
-        PluginContract.Kind kind = readContractKind(annotation, contract);
+        PluginContract.Role role = readContractRole(annotation, contract);
         List<TypeElement> requiredContracts = readClassArrayAnnotationValue(annotation, "requires");
         List<TypeElement> providers = readRequiredProviders(annotation);
         
-        return new PluginContractModel(kind, List.copyOf(requiredContracts), List.copyOf(providers));
+        return new PluginContractModel(role, List.copyOf(requiredContracts), List.copyOf(providers));
     }
     
     /**
-     * Reads the {@code kind} member of a {@code @PluginContract} annotation.
+     * Reads the {@code role} member of a {@code @PluginContract} annotation.
      *
      * @param annotation the contract annotation mirror
      * @param contract the annotated contract, used for diagnostics
-     * @return the parsed contract kind
+     * @return the parsed contract role
      */
-    private PluginContract.Kind readContractKind(AnnotationMirror annotation, TypeElement contract) {
-        AnnotationValue value = getAnnotationValue(annotation, "kind");
+    private PluginContract.Role readContractRole(AnnotationMirror annotation, TypeElement contract) {
+        AnnotationValue value = getAnnotationValue(annotation, "role");
         if (value == null) {
-            error(contract, "@PluginContract.kind is required");
+            error(contract, "@PluginContract.role is required");
             throw new ProcessorException();
         }
         
         Object raw = value.getValue();
         if (!(raw instanceof VariableElement enumConstant)) {
-            error(contract, "@PluginContract.kind must be an enum constant");
+            error(contract, "@PluginContract.role must be an enum constant");
             throw new ProcessorException();
         }
         
         try {
-            return PluginContract.Kind.valueOf(enumConstant.getSimpleName().toString());
+            return PluginContract.Role.valueOf(enumConstant.getSimpleName().toString());
         } catch (IllegalArgumentException ex) {
-            error(contract, "Unsupported @PluginContract.kind: " + enumConstant.getSimpleName());
+            error(contract, "Unsupported @PluginContract.role: " + enumConstant.getSimpleName());
             throw new ProcessorException();
         }
     }
@@ -1151,12 +1151,12 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Internal in-memory representation of one contract interface.
      *
-     * @param kind whether the contract is a base contract or a capability
+     * @param role whether the contract is a base contract or a capability
      * @param requiredContracts contracts that must also be implemented
      * @param providers providers required by this contract
      */
     private record PluginContractModel(
-        PluginContract.Kind kind,
+        PluginContract.Role role,
         List<TypeElement> requiredContracts,
         List<TypeElement> providers
     ) {

@@ -51,7 +51,7 @@ class PluginContractProcessorTest {
                         import %s;
                     
                         @PluginContract(
-                            kind = PluginContract.Kind.BASE,
+                            role = PluginContract.Role.BASE,
                             providers = { @RequiredProvider(TestProvider.class) }
                         )
                         public interface TestPlugin extends Plugin {
@@ -111,7 +111,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -129,7 +129,7 @@ class PluginContractProcessorTest {
                         import %s;
                     
                         @DataversePlugin
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public class InvalidImplementation implements TestPlugin {
                             @Override
                             public String identity() {
@@ -158,7 +158,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 2;
                         }
@@ -197,7 +197,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 4;
                         }
@@ -243,7 +243,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 5;
                         }
@@ -287,7 +287,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface BasePluginA extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -304,7 +304,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface BasePluginB extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -346,7 +346,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface BasePlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -365,7 +365,7 @@ class PluginContractProcessorTest {
                         import %s;
                     
                         @PluginContract(
-                            kind = PluginContract.Kind.CAPABILITY,
+                            role = PluginContract.Role.CAPABILITY,
                             requires = { BasePlugin.class }
                         )
                         public interface CapabilityPlugin extends Plugin {
@@ -464,7 +464,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 2;
                         }
@@ -515,7 +515,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -557,7 +557,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -599,7 +599,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.CAPABILITY)
+                        @PluginContract(role = PluginContract.Role.CAPABILITY)
                         public interface CapabilityPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -627,7 +627,7 @@ class PluginContractProcessorTest {
             ));
             
             assertFalse(result.success(), "Compilation should fail");
-            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "exactly one Kind.BASE @PluginContract");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "exactly one Role.BASE @PluginContract");
         }
         
         @Test
@@ -698,7 +698,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 6;
                         }
@@ -750,7 +750,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -817,7 +817,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface LonelyPluginContract extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -863,7 +863,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface TestPlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -902,7 +902,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface BasePlugin extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -971,7 +971,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface PluginTypeA extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -988,7 +988,7 @@ class PluginContractProcessorTest {
                         import %s;
                         import %s;
                     
-                        @PluginContract(kind = PluginContract.Kind.BASE)
+                        @PluginContract(role = PluginContract.Role.BASE)
                         public interface PluginTypeB extends Plugin {
                             int API_LEVEL = 1;
                         }
@@ -1059,7 +1059,7 @@ class PluginContractProcessorTest {
                     import %s;
                     import %s;
 
-                    @PluginContract(kind = PluginContract.Kind.BASE)
+                    @PluginContract(role = PluginContract.Role.BASE)
                     public interface MissingApiLevelPlugin extends Plugin {
                     }
                     """.formatted(
@@ -1100,7 +1100,7 @@ class PluginContractProcessorTest {
                     import %s;
                     import %s;
 
-                    @PluginContract(kind = PluginContract.Kind.BASE)
+                    @PluginContract(role = PluginContract.Role.BASE)
                     public interface NonConstantApiLevelPlugin extends Plugin {
                         Integer API_LEVEL = Integer.valueOf(2);
                     }
@@ -1154,7 +1154,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.BASE,
+                        role = PluginContract.Role.BASE,
                         providers = { @RequiredProvider(NotAProvider.class) }
                     )
                     public interface InvalidProviderPlugin extends Plugin {
@@ -1212,7 +1212,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.BASE,
+                        role = PluginContract.Role.BASE,
                         providers = { @RequiredProvider(MissingProviderApiLevel.class) }
                     )
                     public interface TestPlugin extends Plugin {
@@ -1271,7 +1271,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.BASE,
+                        role = PluginContract.Role.BASE,
                         providers = { @RequiredProvider(NonConstantProviderApiLevel.class) }
                     )
                     public interface TestPlugin extends Plugin {
@@ -1330,7 +1330,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.BASE,
+                        role = PluginContract.Role.BASE,
                         providers = { @RequiredProvider(TestProvider.class) }
                     )
                     public interface BasePlugin extends Plugin {
@@ -1351,7 +1351,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.CAPABILITY,
+                        role = PluginContract.Role.CAPABILITY,
                         requires = { BasePlugin.class }
                     )
                     public interface IntermediateCapability extends BasePlugin {
@@ -1371,7 +1371,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.CAPABILITY,
+                        role = PluginContract.Role.CAPABILITY,
                         requires = { BasePlugin.class, IntermediateCapability.class }
                     )
                     public interface LeafCapability extends IntermediateCapability {
@@ -1442,7 +1442,7 @@ class PluginContractProcessorTest {
                     import %s;
                     import %s;
 
-                    @PluginContract(kind = PluginContract.Kind.BASE)
+                    @PluginContract(role = PluginContract.Role.BASE)
                     public interface TestPlugin extends Plugin {
                         int API_LEVEL = 2;
                     }
@@ -1523,7 +1523,7 @@ class PluginContractProcessorTest {
                     import %s;
                     import %s;
 
-                    @PluginContract(kind = PluginContract.Kind.BASE)
+                    @PluginContract(role = PluginContract.Role.BASE)
                     public interface BasePlugin extends Plugin {
                         int API_LEVEL = 1;
                     }
@@ -1542,7 +1542,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.CAPABILITY,
+                        role = PluginContract.Role.CAPABILITY,
                         requires = { BasePlugin.class },
                         providers = { @RequiredProvider(SharedProvider.class) }
                     )
@@ -1565,7 +1565,7 @@ class PluginContractProcessorTest {
                     import %s;
 
                     @PluginContract(
-                        kind = PluginContract.Kind.CAPABILITY,
+                        role = PluginContract.Role.CAPABILITY,
                         requires = { BasePlugin.class },
                         providers = { @RequiredProvider(SharedProvider.class) }
                     )

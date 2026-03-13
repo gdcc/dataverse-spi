@@ -20,11 +20,11 @@ public @interface PluginContract {
     /**
      * Whether this contract is the primary plugin kind or an optional capability.
      */
-    Kind kind();
+    Role role();
 
     /**
      * Other plugin contracts that must also be implemented if this contract is implemented.
-     * Example: a {@link Kind#CAPABILITY} contract should ask for a {@link Kind#BASE} contract to be implemented.
+     * Example: a {@link Role#CAPABILITY} contract should ask for a {@link Role#BASE} contract to be implemented.
      */
     Class<? extends Plugin>[] requires() default {};
 
@@ -36,7 +36,7 @@ public @interface PluginContract {
     /**
      * Distinguishes a base plugin contract from optional capability contracts.
      */
-    enum Kind {
+    enum Role {
         BASE,
         CAPABILITY
     }
