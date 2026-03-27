@@ -9,12 +9,12 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
- * Defines constants for the format and structure of plugin descriptor files.
+ * Defines constants for the format and structure of plugin plugin files.
  * These descriptors provide metadata about plugins, including their
  * implementation class, type, contracts, and required providers.
  *
  * <ul>
- * - DESCRIPTOR_DIRECTORY: Specifies the directory where plugin descriptor files are located.
+ * - DESCRIPTOR_DIRECTORY: Specifies the directory where plugin plugin files are located.
  * - PLUGIN_CLASS_FIELD: Defines the key used to identify the plugin's implementation class.
  * - PLUGIN_KIND_FIELD: Defines the key used to specify the base contract type of the plugin.
  * - CONTRACT_PREFIX and CONTRACT_SUFFIX: Define the keys used to denote the contracts
@@ -23,7 +23,7 @@ import java.util.Properties;
  *   required providers and their associated API levels.
  * </ul>
  */
-public final class PluginDescriptorFormat {
+public final class DescriptorFormat {
     public static final String DESCRIPTOR_DIRECTORY = "META-INF/dataverse/plugins/";
     public static final String DESCRIPTOR_EXTENSION = ".properties";
     
@@ -34,7 +34,7 @@ public final class PluginDescriptorFormat {
     public static final String REQUIRED_PROVIDER_PREFIX = "plugin.requires.";
     public static final String REQUIRED_PROVIDER_SUFFIX = ".level";
     
-    private PluginDescriptorFormat() {
+    private DescriptorFormat() {
         /* Intentionally left blank for helper class */
     }
     
@@ -71,18 +71,18 @@ public final class PluginDescriptorFormat {
     }
     
     /**
-     * Serializes the provided {@link PluginDescriptor} into the given {@link Writer}
+     * Serializes the provided {@link Descriptor} into the given {@link Writer}
      * in the form of a properties file, encoding plugin metadata such as plugin class,
      * plugin kind, implemented contracts, and required providers.
      *
-     * @param descriptor the {@link PluginDescriptor} containing the plugin metadata to be serialized
-     * @param writer the {@link Writer} where the descriptor properties will be written
+     * @param descriptor the {@link Descriptor} containing the plugin metadata to be serialized
+     * @param writer the {@link Writer} where the plugin properties will be written
      * @throws IOException if an I/O error occurs while writing to the {@link Writer}
      */
-    public static void write(PluginDescriptor descriptor, Writer writer) throws IOException {
+    public static void write(Descriptor descriptor, Writer writer) throws IOException {
         Properties properties = new Properties();
-        properties.setProperty(PLUGIN_CLASS_FIELD, descriptor.pluginClass());
-        properties.setProperty(PLUGIN_KIND_FIELD, descriptor.pluginKind());
+        properties.setProperty(PLUGIN_CLASS_FIELD, descriptor.klass());
+        properties.setProperty(PLUGIN_KIND_FIELD, descriptor.kind());
         
         descriptor.contracts().forEach((contract, level) ->
             properties.setProperty(toContractLevel(contract), Integer.toString(level)));
@@ -94,18 +94,18 @@ public final class PluginDescriptorFormat {
     }
     
     /**
-     * Reads a plugin descriptor from the serialized properties format.
+     * Reads a plugin plugin from the serialized properties format.
      *
-     * <p>The returned descriptor contains the mandatory plugin class and base contract fields,
+     * <p>The returned plugin contains the mandatory plugin class and base contract fields,
      * plus all parsed contract/provider API levels found in the input.</p>
      *
-     * @param reader the character stream containing descriptor properties
-     * @return the parsed descriptor
+     * @param reader the character stream containing plugin properties
+     * @return the parsed plugin.
      * @throws IOException if the properties cannot be read
      * @throws IllegalArgumentException if mandatory fields are missing or if any level value
      *         cannot be parsed as an integer
      */
-    public static PluginDescriptor read(Reader reader) throws IOException {
+    public static Descriptor read(Reader reader) throws IOException {
         Properties properties = new Properties();
         properties.load(reader);
         
@@ -144,27 +144,27 @@ public final class PluginDescriptorFormat {
             }
         }
         
-        return new PluginDescriptor(
+        return new Descriptor(
             pluginClass,
             pluginKind,
-            Map.copyOf(contracts),
-            Map.copyOf(requiredProviders)
+            contracts,
+            requiredProviders
         );
     }
     
     /**
-     * Reads a plugin descriptor from the given string content.
+     * Reads a plugin plugin from the given string content.
      *
-     * This method parses the input string into a {@link PluginDescriptor} object. It internally utilizes
+     * This method parses the input string into a {@link Descriptor} object. It internally utilizes
      * a {@link StringReader} to read the string and expects the content to be in a properties-based serialized format.
      *
-     * @param content the string content containing serialized descriptor properties
-     * @return the parsed {@link PluginDescriptor}
+     * @param content the string content containing serialized plugin properties
+     * @return the parsed {@link Descriptor}
      * @throws RuntimeException if an I/O error occurs
      * @throws IllegalArgumentException if mandatory fields are missing
      */
-    public static PluginDescriptor read(String content) {
-        PluginDescriptor descriptor = null;
+    public static Descriptor read(String content) {
+        Descriptor descriptor = null;
         
         try (StringReader reader = new StringReader(content)) {
             descriptor = read(reader);

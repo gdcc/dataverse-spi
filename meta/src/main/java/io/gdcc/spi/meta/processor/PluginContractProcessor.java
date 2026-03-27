@@ -1,8 +1,8 @@
 package io.gdcc.spi.meta.processor;
 
 import io.gdcc.spi.meta.annotations.PluginContract;
-import io.gdcc.spi.meta.descriptor.PluginDescriptor;
-import io.gdcc.spi.meta.descriptor.PluginDescriptorFormat;
+import io.gdcc.spi.meta.descriptor.Descriptor;
+import io.gdcc.spi.meta.descriptor.DescriptorFormat;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -44,7 +44,7 @@ import java.util.TreeSet;
  * plugin contracts annotated with {@code @PluginContract}, validates the contract graph, and emits:</p>
  *
  * <ol>
- *   <li>a per-plugin descriptor under {@value #DESCRIPTOR_DIRECTORY}, and</li>
+ *   <li>a per-plugin descriptor under {@value DescriptorFormat#DESCRIPTOR_DIRECTORY}, and</li>
  *   <li>a {@code META-INF/services/...} entry for the base plugin contract when safe to do so.</li>
  * </ol>
  *
@@ -142,7 +142,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * <p>Descriptors are written only after processing is over, which keeps resource generation
      * deterministic and avoids partial aggregate state.</p>
      */
-    private final Map<String, PluginDescriptor> descriptors = new LinkedHashMap<>();
+    private final Map<String, Descriptor> descriptors = new LinkedHashMap<>();
     
     /**
      * Service registrations grouped by base contract name.
@@ -361,7 +361,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         descriptors.put(
             implementationClassName,
-            new PluginDescriptor(
+            new Descriptor(
                 implementationClassName,
                 baseContractName,
                 contractLevels,
@@ -901,7 +901,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * are not externally managed via {@code @AutoService}.</p>
      */
     private void writeAllGeneratedResources() {
-        for (PluginDescriptor descriptor : descriptors.values()) {
+        for (Descriptor descriptor : descriptors.values()) {
             writeDescriptor(descriptor);
         }
         
@@ -917,10 +917,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Writes one generated plugin descriptor file.
      *
-     * @param descriptor the descriptor model to serialize
+     * @param descriptor the plugin descriptor model to serialize
      */
-    private void writeDescriptor(PluginDescriptor descriptor) {
-        String resourceName = PluginDescriptorFormat.toPath(descriptor.pluginClass());
+    private void writeDescriptor(Descriptor descriptor) {
+        String resourceName = DescriptorFormat.toPath(descriptor.klass());
         
         try {
             FileObject resource = processingEnv
@@ -928,12 +928,12 @@ public final class PluginContractProcessor extends AbstractProcessor {
                 .createResource(StandardLocation.CLASS_OUTPUT, "", resourceName);
             
             try (Writer writer = resource.openWriter()) {
-                PluginDescriptorFormat.write(descriptor, writer);
+                DescriptorFormat.write(descriptor, writer);
             }
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(
                 Diagnostic.Kind.ERROR,
-                "Failed to write descriptor for " + descriptor.pluginClass() + ": " + e.getMessage()
+                "Failed to write descriptor for " + descriptor.klass() + ": " + e.getMessage()
             );
         }
     }

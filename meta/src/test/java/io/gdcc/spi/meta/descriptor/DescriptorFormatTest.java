@@ -13,27 +13,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class PluginDescriptorFormatTest {
+class DescriptorFormatTest {
     
     @Nested
     class Fields {
         @Test
         void toFilename_UsesDescriptorExtension_ForString() {
-            String result = PluginDescriptorFormat.toFilename("io.gdcc.example.MyPlugin");
+            String result = DescriptorFormat.toFilename("io.gdcc.example.MyPlugin");
             
             assertEquals("io.gdcc.example.MyPlugin.properties", result);
         }
         
         @Test
         void toFilename_UsesDescriptorExtension_ForClass() {
-            String result = PluginDescriptorFormat.toFilename(SamplePlugin.class);
+            String result = DescriptorFormat.toFilename(SamplePlugin.class);
             
-            assertEquals("io.gdcc.spi.meta.descriptor.PluginDescriptorFormatTest.SamplePlugin.properties", result);
+            assertEquals("io.gdcc.spi.meta.descriptor.DescriptorFormatTest.SamplePlugin.properties", result);
         }
         
         @Test
         void toPath_PrependsDescriptorDirectory_ForString() {
-            String result = PluginDescriptorFormat.toPath("io.gdcc.example.MyPlugin");
+            String result = DescriptorFormat.toPath("io.gdcc.example.MyPlugin");
             
             assertEquals(
                 "META-INF/dataverse/plugins/io.gdcc.example.MyPlugin.properties",
@@ -43,17 +43,17 @@ class PluginDescriptorFormatTest {
         
         @Test
         void toPath_PrependsDescriptorDirectory_ForClass() {
-            String result = PluginDescriptorFormat.toPath(SamplePlugin.class);
+            String result = DescriptorFormat.toPath(SamplePlugin.class);
             
             assertEquals(
-                "META-INF/dataverse/plugins/io.gdcc.spi.meta.descriptor.PluginDescriptorFormatTest.SamplePlugin.properties",
+                "META-INF/dataverse/plugins/io.gdcc.spi.meta.descriptor.DescriptorFormatTest.SamplePlugin.properties",
                 result
             );
         }
         
         @Test
         void toContractLevel_CreatesExpectedPropertyKey_ForString() {
-            String result = PluginDescriptorFormat.toContractLevel("io.gdcc.example.ExportPlugin");
+            String result = DescriptorFormat.toContractLevel("io.gdcc.example.ExportPlugin");
             
             assertEquals(
                 "plugin.implements.io.gdcc.example.ExportPlugin.level",
@@ -63,17 +63,17 @@ class PluginDescriptorFormatTest {
         
         @Test
         void toContractLevel_CreatesExpectedPropertyKey_ForClass() {
-            String result = PluginDescriptorFormat.toContractLevel(SampleContract.class);
+            String result = DescriptorFormat.toContractLevel(SampleContract.class);
             
             assertEquals(
-                "plugin.implements.io.gdcc.spi.meta.descriptor.PluginDescriptorFormatTest.SampleContract.level",
+                "plugin.implements.io.gdcc.spi.meta.descriptor.DescriptorFormatTest$SampleContract.level",
                 result
             );
         }
         
         @Test
         void toRequiredProviderLevel_CreatesExpectedPropertyKey_ForString() {
-            String result = PluginDescriptorFormat.toRequiredProviderLevel("io.gdcc.example.ExportProvider");
+            String result = DescriptorFormat.toRequiredProviderLevel("io.gdcc.example.ExportProvider");
             
             assertEquals(
                 "plugin.requires.io.gdcc.example.ExportProvider.level",
@@ -83,10 +83,10 @@ class PluginDescriptorFormatTest {
         
         @Test
         void toRequiredProviderLevel_CreatesExpectedPropertyKey_ForClass() {
-            String result = PluginDescriptorFormat.toRequiredProviderLevel(SampleProvider.class);
+            String result = DescriptorFormat.toRequiredProviderLevel(SampleProvider.class);
             
             assertEquals(
-                "plugin.requires.io.gdcc.spi.meta.descriptor.PluginDescriptorFormatTest.SampleProvider.level",
+                "plugin.requires.io.gdcc.spi.meta.descriptor.DescriptorFormatTest$SampleProvider.level",
                 result
             );
         }
@@ -96,7 +96,7 @@ class PluginDescriptorFormatTest {
     class Write {
         @Test
         void write_WritesCoreFieldsContractsAndProviders() throws IOException {
-            PluginDescriptor descriptor = new PluginDescriptor(
+            Descriptor descriptor = new Descriptor(
                 "io.gdcc.example.MyPlugin",
                 "io.gdcc.example.ExportPlugin",
                 Map.of(
@@ -110,12 +110,12 @@ class PluginDescriptorFormatTest {
             
             StringWriter writer = new StringWriter();
             
-            PluginDescriptorFormat.write(descriptor, writer);
+            DescriptorFormat.write(descriptor, writer);
             
             Properties properties = loadProperties(writer.toString());
             
-            assertEquals("io.gdcc.example.MyPlugin", properties.getProperty(PluginDescriptorFormat.PLUGIN_CLASS_FIELD));
-            assertEquals("io.gdcc.example.ExportPlugin", properties.getProperty(PluginDescriptorFormat.PLUGIN_KIND_FIELD));
+            assertEquals("io.gdcc.example.MyPlugin", properties.getProperty(DescriptorFormat.PLUGIN_CLASS_FIELD));
+            assertEquals("io.gdcc.example.ExportPlugin", properties.getProperty(DescriptorFormat.PLUGIN_KIND_FIELD));
             assertEquals("2", properties.getProperty("plugin.implements.io.gdcc.example.ExportPlugin.level"));
             assertEquals("1", properties.getProperty("plugin.implements.io.gdcc.example.XmlCapability.level"));
             assertEquals("5", properties.getProperty("plugin.requires.io.gdcc.example.ExportProvider.level"));
@@ -123,7 +123,7 @@ class PluginDescriptorFormatTest {
         
         @Test
         void write_WritesCoreFields_WhenContractsAndProvidersAreEmpty() throws IOException {
-            PluginDescriptor descriptor = new PluginDescriptor(
+            Descriptor descriptor = new Descriptor(
                 "io.gdcc.example.MinimalPlugin",
                 "io.gdcc.example.ExportPlugin",
                 Map.of(),
@@ -132,18 +132,18 @@ class PluginDescriptorFormatTest {
             
             StringWriter writer = new StringWriter();
             
-            PluginDescriptorFormat.write(descriptor, writer);
+            DescriptorFormat.write(descriptor, writer);
             
             Properties properties = loadProperties(writer.toString());
             
-            assertEquals("io.gdcc.example.MinimalPlugin", properties.getProperty(PluginDescriptorFormat.PLUGIN_CLASS_FIELD));
-            assertEquals("io.gdcc.example.ExportPlugin", properties.getProperty(PluginDescriptorFormat.PLUGIN_KIND_FIELD));
+            assertEquals("io.gdcc.example.MinimalPlugin", properties.getProperty(DescriptorFormat.PLUGIN_CLASS_FIELD));
+            assertEquals("io.gdcc.example.ExportPlugin", properties.getProperty(DescriptorFormat.PLUGIN_KIND_FIELD));
             assertEquals(2, properties.size(), "Only the two mandatory core fields should be present");
         }
         
         @Test
         void write_UsesHelperGeneratedPropertyKeys() throws IOException {
-            PluginDescriptor descriptor = new PluginDescriptor(
+            Descriptor descriptor = new Descriptor(
                 "io.gdcc.example.MyPlugin",
                 "io.gdcc.example.ExportPlugin",
                 Map.of("io.gdcc.example.ExportPlugin", 7),
@@ -152,34 +152,34 @@ class PluginDescriptorFormatTest {
             
             StringWriter writer = new StringWriter();
             
-            PluginDescriptorFormat.write(descriptor, writer);
+            DescriptorFormat.write(descriptor, writer);
             
             String serialized = writer.toString();
             
-            assertTrue(serialized.contains(PluginDescriptorFormat.toContractLevel("io.gdcc.example.ExportPlugin") + "=7"));
-            assertTrue(serialized.contains(PluginDescriptorFormat.toRequiredProviderLevel("io.gdcc.example.ExportProvider") + "=11"));
+            assertTrue(serialized.contains(DescriptorFormat.toContractLevel("io.gdcc.example.ExportPlugin") + "=7"));
+            assertTrue(serialized.contains(DescriptorFormat.toRequiredProviderLevel("io.gdcc.example.ExportProvider") + "=11"));
         }
         
         @Test
         void stringAndClassOverloadsProduceEquivalentResults() {
             assertEquals(
-                PluginDescriptorFormat.toFilename(SamplePlugin.class),
-                PluginDescriptorFormat.toFilename(SamplePlugin.class.getCanonicalName())
+                DescriptorFormat.toFilename(SamplePlugin.class),
+                DescriptorFormat.toFilename(SamplePlugin.class.getName())
             );
             
             assertEquals(
-                PluginDescriptorFormat.toPath(SamplePlugin.class),
-                PluginDescriptorFormat.toPath(SamplePlugin.class.getCanonicalName())
+                DescriptorFormat.toPath(SamplePlugin.class),
+                DescriptorFormat.toPath(SamplePlugin.class.getName())
             );
             
             assertEquals(
-                PluginDescriptorFormat.toContractLevel(SampleContract.class),
-                PluginDescriptorFormat.toContractLevel(SampleContract.class.getCanonicalName())
+                DescriptorFormat.toContractLevel(SampleContract.class),
+                DescriptorFormat.toContractLevel(SampleContract.class.getName())
             );
             
             assertEquals(
-                PluginDescriptorFormat.toRequiredProviderLevel(SampleProvider.class),
-                PluginDescriptorFormat.toRequiredProviderLevel(SampleProvider.class.getCanonicalName())
+                DescriptorFormat.toRequiredProviderLevel(SampleProvider.class),
+                DescriptorFormat.toRequiredProviderLevel(SampleProvider.class.getName())
             );
         }
         
@@ -199,10 +199,10 @@ class PluginDescriptorFormatTest {
             plugin.kind=io.gdcc.example.ExportPlugin
             """;
             
-            PluginDescriptor descriptor = PluginDescriptorFormat.read(new StringReader(serialized));
+            Descriptor descriptor = DescriptorFormat.read(new StringReader(serialized));
             
-            assertEquals("io.gdcc.example.MyPlugin", descriptor.pluginClass());
-            assertEquals("io.gdcc.example.ExportPlugin", descriptor.pluginKind());
+            assertEquals("io.gdcc.example.MyPlugin", descriptor.klass());
+            assertEquals("io.gdcc.example.ExportPlugin", descriptor.kind());
             assertEquals(Map.of(), descriptor.contracts());
             assertEquals(Map.of(), descriptor.requiredProviders());
         }
@@ -218,10 +218,10 @@ class PluginDescriptorFormatTest {
             plugin.requires.io.gdcc.example.BatchProvider.level=9
             """;
             
-            PluginDescriptor descriptor = PluginDescriptorFormat.read(new StringReader(serialized));
+            Descriptor descriptor = DescriptorFormat.read(new StringReader(serialized));
             
-            assertEquals("io.gdcc.example.MyPlugin", descriptor.pluginClass());
-            assertEquals("io.gdcc.example.ExportPlugin", descriptor.pluginKind());
+            assertEquals("io.gdcc.example.MyPlugin", descriptor.klass());
+            assertEquals("io.gdcc.example.ExportPlugin", descriptor.kind());
             assertEquals(
                 Map.of(
                     "io.gdcc.example.ExportPlugin", 2,
@@ -249,10 +249,10 @@ class PluginDescriptorFormatTest {
             unrelated.field=42
             """;
             
-            PluginDescriptor descriptor = PluginDescriptorFormat.read(new StringReader(serialized));
+            Descriptor descriptor = DescriptorFormat.read(new StringReader(serialized));
             
-            assertEquals("io.gdcc.example.MyPlugin", descriptor.pluginClass());
-            assertEquals("io.gdcc.example.ExportPlugin", descriptor.pluginKind());
+            assertEquals("io.gdcc.example.MyPlugin", descriptor.klass());
+            assertEquals("io.gdcc.example.ExportPlugin", descriptor.kind());
             assertEquals(Map.of("io.gdcc.example.ExportPlugin", 2), descriptor.contracts());
             assertEquals(Map.of("io.gdcc.example.ExportProvider", 5), descriptor.requiredProviders());
         }
@@ -266,7 +266,7 @@ class PluginDescriptorFormatTest {
             
             IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> PluginDescriptorFormat.read(new StringReader(serialized))
+                () -> DescriptorFormat.read(new StringReader(serialized))
             );
             
             assertEquals("Missing required property plugin.class", ex.getMessage());
@@ -281,7 +281,7 @@ class PluginDescriptorFormatTest {
             
             IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> PluginDescriptorFormat.read(new StringReader(serialized))
+                () -> DescriptorFormat.read(new StringReader(serialized))
             );
             
             assertEquals("Missing required property plugin.kind", ex.getMessage());
@@ -297,7 +297,7 @@ class PluginDescriptorFormatTest {
             
             IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> PluginDescriptorFormat.read(new StringReader(serialized))
+                () -> DescriptorFormat.read(new StringReader(serialized))
             );
             
             assertEquals(
@@ -316,7 +316,7 @@ class PluginDescriptorFormatTest {
             
             IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> PluginDescriptorFormat.read(new StringReader(serialized))
+                () -> DescriptorFormat.read(new StringReader(serialized))
             );
             
             assertEquals(
@@ -327,7 +327,7 @@ class PluginDescriptorFormatTest {
         
         @Test
         void read_RoundTripsWithWrite() throws IOException {
-            PluginDescriptor original = new PluginDescriptor(
+            Descriptor original = new Descriptor(
                 "io.gdcc.example.MyPlugin",
                 "io.gdcc.example.ExportPlugin",
                 Map.of(
@@ -340,12 +340,12 @@ class PluginDescriptorFormatTest {
             );
             
             StringWriter writer = new StringWriter();
-            PluginDescriptorFormat.write(original, writer);
+            DescriptorFormat.write(original, writer);
             
-            PluginDescriptor reread = PluginDescriptorFormat.read(new StringReader(writer.toString()));
+            Descriptor reread = DescriptorFormat.read(new StringReader(writer.toString()));
             
-            assertEquals(original.pluginClass(), reread.pluginClass());
-            assertEquals(original.pluginKind(), reread.pluginKind());
+            assertEquals(original.klass(), reread.klass());
+            assertEquals(original.kind(), reread.kind());
             assertEquals(original.contracts(), reread.contracts());
             assertEquals(original.requiredProviders(), reread.requiredProviders());
         }
