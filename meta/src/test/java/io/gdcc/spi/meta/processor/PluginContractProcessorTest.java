@@ -1049,6 +1049,47 @@ class PluginContractProcessorTest {
     @Nested
     class EdgeCases {
         @Test
+        void failsWhenContractIsOnNonPluginInterface() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/MissingExtendsPlugin.java",
+                    """
+                    package test;
+
+                    import %s;
+                    import %s;
+
+                    @PluginContract(role = PluginContract.Role.BASE)
+                    public interface MissingExtendsPlugin {
+                    }
+                    """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/MissingExtendsPluginImpl.java",
+                    """
+                    package test;
+
+                    import %s;
+
+                    @DataversePlugin
+                    public class MissingExtendsPluginImpl implements MissingExtendsPlugin {
+                        @Override
+                        public String identity() {
+                            return "missing-extends-plugin";
+                        }
+                    }
+                    """.formatted(DataversePlugin.class.getCanonicalName())
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "must implement a specific @PluginContract interface");
+        }
+        
+        @Test
         void failsWhenContractApiLevelIsMissing() throws IOException {
             ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
                 source(
