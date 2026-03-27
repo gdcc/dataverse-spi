@@ -3,6 +3,7 @@ package io.gdcc.spi.meta.processor;
 import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.descriptor.Descriptor;
 import io.gdcc.spi.meta.descriptor.DescriptorFormat;
+import io.gdcc.spi.meta.plugin.Plugin;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -115,11 +116,6 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * Name of the compile-time constant field carrying the contract version.
      */
     private static final String API_LEVEL_FIELD = "API_LEVEL";
-    
-    /**
-     * Output directory for generated plugin descriptors.
-     */
-    private static final String DESCRIPTOR_DIRECTORY = "META-INF/dataverse/plugins/";
     
     /**
      * Output directory for generated ServiceLoader files.
@@ -307,7 +303,9 @@ public final class PluginContractProcessor extends AbstractProcessor {
         if (contracts.isEmpty()) {
             error(
                 implementation,
-                "No implemented plugin contracts found; implementations must implement a specific @PluginContract interface"
+                "No implemented plugin contracts found; " +
+                    "implementations must implement a specific @PluginContract interface " +
+                    "which itself extends " + Plugin.class.getName()
             );
             throw new ProcessorException();
         }
