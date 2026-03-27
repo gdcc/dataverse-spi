@@ -38,16 +38,29 @@ public final class DescriptorFormat {
         /* Intentionally left blank for helper class */
     }
     
-    public static String toFilename(Class<?> klazz) {
-        return toFilename(klazz.getCanonicalName());
+    /**
+     * Transforms the provided class into its canonical name representation.
+     * Reusable in different places to keep serialization from class to FQCN aligned.
+     *
+     * @param klass the {@link Class} object whose canonical name is to be returned
+     * @return the name of the specified class, or null if the class does not have a name.
+     *         Note: not using the canonical name to avoid issues with inner classes and de/serialization.
+     */
+    public static String transformClassName(Class<?> klass) {
+        return klass.getName();
+    }
+    
+    public static String toFilename(Class<?> klass) {
+        return toFilename(transformClassName(klass));
     }
     
     public static String toFilename(String fqcn) {
-        return fqcn + DESCRIPTOR_EXTENSION;
+        // The FQCN may contain "$" from inner classes. This would be bad for filenames.
+        return fqcn.replace('$', '.') + DESCRIPTOR_EXTENSION;
     }
     
-    public static String toPath(Class<?> klazz) {
-        return toPath(klazz.getCanonicalName());
+    public static String toPath(Class<?> klass) {
+        return toPath(transformClassName(klass));
     }
     
     public static String toPath(String fqcn) {
@@ -55,7 +68,7 @@ public final class DescriptorFormat {
     }
     
     public static String toContractLevel(Class<?> contractClass) {
-        return toContractLevel(contractClass.getCanonicalName());
+        return toContractLevel(transformClassName(contractClass));
     }
     
     public static String toContractLevel(String contractFQCN) {
@@ -63,7 +76,7 @@ public final class DescriptorFormat {
     }
     
     public static String toRequiredProviderLevel(Class<?> providerClass) {
-        return toRequiredProviderLevel(providerClass.getCanonicalName());
+        return toRequiredProviderLevel(transformClassName(providerClass));
     }
     
     public static String toRequiredProviderLevel(String providerFQCN) {
