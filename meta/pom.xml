@@ -10,7 +10,8 @@
     </parent>
     
     <artifactId>meta</artifactId>
-    <version>${spi.meta.version}</version>
+    <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
+    <!-- <version>x.y.z.-SNAPSHOT</version> -->
     
     <build>
         <plugins>

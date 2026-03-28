@@ -10,7 +10,8 @@
     </parent>
     
     <artifactId>export</artifactId>
-    <version>${spi.export.version}</version>
+    <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
+    <!-- <version>x.y.z.-SNAPSHOT</version> -->
     
     <dependencies>
         <!-- INTERNAL FOUNDATION DEPENDENCIES -->
