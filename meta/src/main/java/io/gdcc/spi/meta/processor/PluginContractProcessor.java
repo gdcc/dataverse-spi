@@ -68,56 +68,6 @@ import java.util.TreeSet;
 public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
-     * Fully qualified name of the implementation marker annotation.
-     *
-     * <p>A string constant is used instead of a direct class literal so this processor can stay
-     * tolerant during bootstrapping and module boundary changes.</p>
-     *
-     * @see io.gdcc.spi.meta.annotations.DataversePlugin
-     */
-    private static final String PLUGIN_IMPLEMENTATION_ANNOTATION = "io.gdcc.spi.meta.annotations.DataversePlugin";
-    
-    /**
-     * Fully qualified name of the contract annotation found on plugin contract interfaces.
-     *
-     * @see io.gdcc.spi.meta.annotations.PluginContract
-     */
-    private static final String PLUGIN_CONTRACT_ANNOTATION = "io.gdcc.spi.meta.annotations.PluginContract";
-    
-    /**
-     * Fully qualified name of the nested provider requirement annotation used inside
-     * {@code @PluginContract.providers()}.
-     *
-     * @see io.gdcc.spi.meta.annotations.RequiredProvider
-     */
-    private static final String REQUIRED_PROVIDER_ANNOTATION = "io.gdcc.spi.meta.annotations.RequiredProvider";
-    
-    /**
-     * Fully qualified name of {@code @AutoService}.
-     *
-     * <p>This processor does not depend on AutoService directly. It merely detects the annotation by
-     * name so it can avoid generating conflicting ServiceLoader resources.</p>
-     */
-    private static final String AUTO_SERVICE_ANNOTATION = "com.google.auto.service.AutoService";
-    
-    /**
-     * Fully qualified name of the common plugin super-interface.
-     * @see io.gdcc.spi.meta.plugin.Plugin
-     */
-    private static final String PLUGIN_INTERFACE = "io.gdcc.spi.meta.plugin.Plugin";
-    
-    /**
-     * Fully qualified name of the common provider super-interface.
-     * @see io.gdcc.spi.meta.plugin.CoreProvider
-     */
-    private static final String CORE_PROVIDER_INTERFACE = "io.gdcc.spi.meta.plugin.CoreProvider";
-    
-    /**
-     * Name of the compile-time constant field carrying the contract version.
-     */
-    private static final String API_LEVEL_FIELD = "API_LEVEL";
-    
-    /**
      * Output directory for generated ServiceLoader files.
      */
     private static final String SERVICES_DIRECTORY = "META-INF/services/";
@@ -232,7 +182,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        TypeElement markerAnnotation = elements.getTypeElement(PLUGIN_IMPLEMENTATION_ANNOTATION);
+        TypeElement markerAnnotation = elements.getTypeElement(ProcessorConstants.PLUGIN_IMPLEMENTATION_ANNOTATION);
         if (markerAnnotation == null) {
             // If the marker annotation itself cannot be resolved, something is wrong with the
             // processor classpath. Returning false leaves room for other processors to continue.
@@ -334,7 +284,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
             // The API level is intentionally read from the compile-time constant present on the
             // contract interface visible during this compilation. This preserves the build-time
             // contract snapshot we later need at runtime.
-            int contractApiLevel = readIntConstant(contract, API_LEVEL_FIELD);
+            int contractApiLevel = readIntConstant(contract, ProcessorConstants.API_LEVEL_FIELD_NAME);
             String contractFQCN = contract.getQualifiedName().toString();
             // The following is just a precaution. As we look into these during compile time, it's hard to imagine
             // a scenario where the levels ever actually differ.
@@ -508,7 +458,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         validateDirectBaseTypeImplementations(typeElement);
         
         if (isPluginInterfaceCandidate(typeElement)) {
-            if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
+            if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
                 error(typeElement, "Plugin interfaces must declare @PluginContract");
                 throw new ProcessorException();
             }
@@ -521,7 +471,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
         
         if (isPluginImplementationCandidate(typeElement)
-            && findAnnotationMirror(typeElement, PLUGIN_IMPLEMENTATION_ANNOTATION) == null) {
+            && findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_IMPLEMENTATION_ANNOTATION) == null) {
             warning(
                 typeElement,
                 "Plugin implementation should declare @DataversePlugin; processing it implicitly"
@@ -549,7 +499,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
             return;
         }
         
-        if (directlyImplementsType(typeElement, PLUGIN_INTERFACE)) {
+        if (directlyImplementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)) {
             error(
                 typeElement,
                 "Plugin implementations must implement a specific plugin contract interface, not Plugin directly"
@@ -557,7 +507,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
             throw new ProcessorException();
         }
         
-        if (directlyImplementsType(typeElement, CORE_PROVIDER_INTERFACE)) {
+        if (directlyImplementsType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE)) {
             error(
                 typeElement,
                 "Core provider implementations must implement a specific provider interface, not CoreProvider directly"
@@ -600,7 +550,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
         if (typeElement.getModifiers().contains(Modifier.ABSTRACT)) {
             return false;
         }
-        return implementsType(typeElement, PLUGIN_INTERFACE) && !isExactType(typeElement, PLUGIN_INTERFACE);
+        return implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE) && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
     }
     
     /**
@@ -611,8 +561,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     private boolean isPluginInterfaceCandidate(TypeElement typeElement) {
         return typeElement.getKind() == ElementKind.INTERFACE
-            && implementsType(typeElement, PLUGIN_INTERFACE)
-            && !isExactType(typeElement, PLUGIN_INTERFACE);
+            && implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)
+            && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
     }
     
     /**
@@ -623,8 +573,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     private boolean isProviderInterfaceCandidate(TypeElement typeElement) {
         return typeElement.getKind() == ElementKind.INTERFACE
-            && implementsType(typeElement, CORE_PROVIDER_INTERFACE)
-            && !isExactType(typeElement, CORE_PROVIDER_INTERFACE);
+            && implementsType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE)
+            && !isExactType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE);
     }
     
     /**
@@ -668,7 +618,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @param typeElement the type currently being inspected
      */
     private void validatePluginContractUsage(TypeElement typeElement) {
-        if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
+        if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
             return;
         }
         
@@ -688,11 +638,11 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @return {@code true} if the type is a plugin contract
      */
     private boolean isPluginContract(TypeElement typeElement) {
-        if (findAnnotationMirror(typeElement, PLUGIN_CONTRACT_ANNOTATION) == null) {
+        if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
             return false;
         }
         
-        TypeElement pluginType = elements.getTypeElement(PLUGIN_INTERFACE);
+        TypeElement pluginType = elements.getTypeElement(ProcessorConstants.PLUGIN_INTERFACE);
         if (pluginType == null) {
             return false;
         }
@@ -710,7 +660,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @return the extracted in-memory contract model
      */
     private PluginContractModel readPluginContractModel(TypeElement contract) {
-        AnnotationMirror annotation = findAnnotationMirror(contract, PLUGIN_CONTRACT_ANNOTATION);
+        AnnotationMirror annotation = findAnnotationMirror(contract, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION);
         if (annotation == null) {
             error(contract, "Missing @PluginContract");
             throw new ProcessorException();
@@ -759,7 +709,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @param contract the contract or provider type to validate
      */
     private void validateApiLevelConstant(TypeElement contract) {
-        readIntConstant(contract, API_LEVEL_FIELD);
+        readIntConstant(contract, ProcessorConstants.API_LEVEL_FIELD_NAME);
     }
     
     /**
@@ -828,9 +778,9 @@ public final class PluginContractProcessor extends AbstractProcessor {
      */
     private Map<String, Integer> readProviderLevels(List<TypeElement> providerTypes, TypeElement implementation) {
         Map<String, Integer> result = new LinkedHashMap<>();
-        TypeElement coreProviderType = elements.getTypeElement(CORE_PROVIDER_INTERFACE);
+        TypeElement coreProviderType = elements.getTypeElement(ProcessorConstants.CORE_PROVIDER_INTERFACE);
         if (coreProviderType == null) {
-            error(implementation, "Cannot resolve " + CORE_PROVIDER_INTERFACE);
+            error(implementation, "Cannot resolve " + ProcessorConstants.CORE_PROVIDER_INTERFACE);
             throw new ProcessorException();
         }
         
@@ -842,12 +792,12 @@ public final class PluginContractProcessor extends AbstractProcessor {
                 error(
                     implementation,
                     "Required provider " + providerType.getQualifiedName()
-                        + " does not implement " + CORE_PROVIDER_INTERFACE
+                        + " does not implement " + ProcessorConstants.CORE_PROVIDER_INTERFACE
                 );
                 throw new ProcessorException();
             }
             
-            int apiLevel = readIntConstant(providerType, API_LEVEL_FIELD);
+            int apiLevel = readIntConstant(providerType, ProcessorConstants.API_LEVEL_FIELD_NAME);
             result.put(providerType.getQualifiedName().toString(), apiLevel);
         }
         
@@ -889,7 +839,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
      * @return {@code true} if {@code @AutoService} is present
      */
     private boolean hasAutoServiceAnnotation(TypeElement implementation) {
-        return findAnnotationMirror(implementation, AUTO_SERVICE_ANNOTATION) != null;
+        return findAnnotationMirror(implementation, ProcessorConstants.AUTO_SERVICE_ANNOTATION) != null;
     }
     
     /**
@@ -1076,7 +1026,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
             
             TypeElement providerAnnotationType = asTypeElement(providerAnnotation.getAnnotationType());
             if (providerAnnotationType == null
-                || !providerAnnotationType.getQualifiedName().contentEquals(REQUIRED_PROVIDER_ANNOTATION)) {
+                || !providerAnnotationType.getQualifiedName().contentEquals(ProcessorConstants.REQUIRED_PROVIDER_ANNOTATION)) {
                 continue;
             }
             

@@ -5,6 +5,7 @@ import io.gdcc.spi.meta.descriptor.PluginDescriptor;
 import io.gdcc.spi.meta.descriptor.SourcedDescriptor;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import io.gdcc.spi.meta.plugin.Plugin;
+import io.gdcc.spi.meta.processor.ProcessorConstants;
 
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
@@ -81,11 +82,10 @@ final class LoaderHelper {
         }
         try {
             // Retrieve the field from exactly this class (we don't want to search any superclasses here!)
-            // TODO: Get the field name from some common place to both loader and annotation processor!
-            Field apiLevel = pluginClass.getDeclaredField("API_LEVEL");
+            Field apiLevel = pluginClass.getDeclaredField(ProcessorConstants.API_LEVEL_FIELD_NAME);
             return apiLevel.getInt(pluginClass);
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IllegalStateException("Plugin contract class must have an (accessible) API_LEVEL field");
+            throw new IllegalStateException("Plugin contract class must have an (accessible) " + ProcessorConstants.API_LEVEL_FIELD_NAME + " field");
         }
     }
     
