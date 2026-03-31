@@ -8,36 +8,96 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Declares that an SPI interface is a versioned plugin contract.
+ * Declares a versioned plugin contract interface.
  *
- * <p>The contract API level is taken from the interface's {@code API_LEVEL}
- * constant by the annotation processor.</p>
+ * <p>A plugin contract defines either a directly loadable plugin kind
+ * ({@link Role#BASE}) or an additional, non-loadable capability
+ * ({@link Role#CAPABILITY}).</p>
+ *
+ * <p>The annotated type must be an {@code interface} extending {@link Plugin}
+ * and must declare a compile-time constant primitive {@code int API_LEVEL} field.
+ * </p>
+ *
+ * <p>General contract rules:</p>
+ * <ol>
+ *   <li>Plugin contracts may only be declared on interfaces.</li>
+ *   <li>Plugin contracts must extend {@link Plugin}.</li>
+ *   <li>Plugin contracts may not extend other plugin contracts. (One exception, see below.)</li>
+ *   <li>A plugin implementation may implement exactly one {@link Role#BASE base contract}.</li>
+ * </ol>
+ *
+ * <p>Base contracts are used as the unique service-loading identity of a plugin.
+ * Capability contracts are never loaded directly; they add optional functionality
+ * and are discovered through generated plugin metadata.</p>
+ *
+ * <p>Capability rules:</p>
+ * <ol>
+ *   <li>A capability contract must declare {@link #requires()}.</li>
+ *   <li>A capability must require exactly one base contract.</li>
+ *   <li>A capability may extend the required base contract to provide default implementations.</li>
+ *   <li>For now, requiring or extending another capability is not supported.</li>
+ *   <li>A plugin implementing a capability must also implement its required base contract.</li>
+ * </ol>
+ *
+ * Note: this annotation cannot be used repeatedly on the same type.
+ *
+ * @implNote Example base contract:
+ * <pre>{@code
+ * @PluginContract(role = PluginContract.Role.BASE)
+ * public interface FooBar extends Plugin {
+ *     int API_LEVEL = 1;
+ * }
+ * }</pre>
+ * Example capability contract:
+ * <pre>{@code
+ * @PluginContract(
+ *     role = PluginContract.Role.CAPABILITY,
+ *     requires = { FooBar.class }
+ * )
+ * public interface BarBeque extends Plugin {
+ *     int API_LEVEL = 1;
+ *
+ *     default String getMediaType() {
+ *         return "application/bbq";
+ *     }
+ * }
+ * }</pre>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface PluginContract {
-
+    
     /**
-     * Whether this contract is the primary plugin kind or an optional capability.
+     * Declares whether this contract is a directly loadable base contract or an additional capability contract.
      */
     Role role();
-
+    
     /**
-     * Other plugin contracts that must also be implemented if this contract is implemented.
-     * Example: a {@link Role#CAPABILITY} contract should ask for a {@link Role#BASE} contract to be implemented.
+     * Other plugin contracts that must also be implemented when this contract is implemented.
+     *
+     * <p>For {@link Role#CAPABILITY capabilities}, this must currently contain exactly one
+     * required {@link Role#BASE base contract}. Capabilities are not directly loadable and
+     * therefore must always be paired with their base contract.</p>
      */
     Class<? extends Plugin>[] requires() default {};
-
+    
     /**
-     * Core providers required by this contract.
+     * Core provider contracts required by this plugin contract.
      */
     RequiredProvider[] providers() default {};
     
     /**
-     * Distinguishes a base plugin contract from optional capability contracts.
+     * Distinguishes directly loadable base contracts from additional capability contracts.
      */
     enum Role {
+        /**
+         * A directly loadable plugin contract.
+         */
         BASE,
+        
+        /**
+         * An additional plugin capability that refines behavior but is not directly loadable.
+         */
         CAPABILITY
     }
 }
