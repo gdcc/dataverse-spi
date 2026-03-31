@@ -21,6 +21,10 @@ import java.util.Optional;
 public interface Exporter extends Plugin {
     
     int API_LEVEL = 2;
+    
+    default String identity() {
+        return this.getFormatName();
+    }
 
     /**
      * When this method is called, the Exporter should write the metadata to the given OutputStream.
