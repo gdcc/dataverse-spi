@@ -1,12 +1,19 @@
 package io.gdcc.spi.export;
 
+import io.gdcc.spi.meta.annotations.PluginContract;
 import jakarta.ws.rs.core.MediaType;
 
 /**
  * XML Exporter is an extension of the base Exporter interface that adds the
  * additional methods needed for generating XML metadata export formats.
  */
+@PluginContract(
+    role = PluginContract.Role.CAPABILITY,
+    requires = Exporter.class
+)
 public interface XMLExporter extends Exporter {
+    
+    int API_LEVEL = 2;
 
     /**
      * @implNote for the ddi exporter, this method returns "ddi:codebook:2_5"

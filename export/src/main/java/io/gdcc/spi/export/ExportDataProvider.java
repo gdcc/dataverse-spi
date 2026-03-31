@@ -1,6 +1,7 @@
 
 package io.gdcc.spi.export;
 
+import io.gdcc.spi.meta.plugin.CoreProvider;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 import org.w3c.dom.Document;
@@ -33,7 +34,9 @@ import java.util.stream.Stream;
  * @see DatasetExportQuery
  * @see FileExportQuery
  */
-public interface ExportDataProvider {
+public interface ExportDataProvider extends CoreProvider {
+    
+    int API_LEVEL = 2;
     
     /**
      * Returns complete dataset metadata in Dataverse's standard JSON format.

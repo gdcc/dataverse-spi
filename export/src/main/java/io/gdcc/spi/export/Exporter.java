@@ -1,5 +1,9 @@
 package io.gdcc.spi.export;
 
+import io.gdcc.spi.meta.annotations.PluginContract;
+import io.gdcc.spi.meta.annotations.RequiredProvider;
+import io.gdcc.spi.meta.plugin.Plugin;
+
 import java.io.OutputStream;
 import java.util.Locale;
 import java.util.Optional;
@@ -10,8 +14,13 @@ import java.util.Optional;
  * deploying new classes that implement this Exporter interface.
  */
 
-public interface Exporter {
-
+@PluginContract(
+    role = PluginContract.Role.BASE,
+    providers = @RequiredProvider(ExportDataProvider.class)
+)
+public interface Exporter extends Plugin {
+    
+    int API_LEVEL = 2;
 
     /**
      * When this method is called, the Exporter should write the metadata to the given OutputStream.
