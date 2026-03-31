@@ -2424,6 +2424,48 @@ class PluginContractProcessorTest {
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "must require single base @PluginContract interface");
         }
+        
+        @Test
+        void compilesWhenBaseContractHasUnrelatedIntermediateInterface() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/BaseSupertype.java",
+                    """
+                        package test;
+                        
+                        import %s;
+                        
+                        public interface BaseSupertype {
+                            String test();
+                        }
+                        """.formatted(Plugin.class.getCanonicalName())
+                ),
+                source(
+                    "test/BasePlugin.java",
+                    """
+                        package test;
+                        
+                        import %s;
+                        import %s;
+                        
+                        @PluginContract(
+                            role = PluginContract.Role.BASE
+                        )
+                        public interface BasePlugin extends BaseSupertype, Plugin {
+                            int API_LEVEL = 1;
+                            default String test() {
+                                return "test";
+                            }
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                )
+            ));
+            
+            assertTrue(result.success(), "Compilation should not fail");
+        }
     }
     
     @Nested
@@ -2526,6 +2568,67 @@ class PluginContractProcessorTest {
             
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "extended base must match the required base");
+        }
+        
+        @Test
+        void compilesWhenCapabilityContractExtendsUnrelatedIntermediateInterface() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/BasePlugin.java",
+                    """
+                        package test;
+                        
+                        import %s;
+                        import %s;
+                        
+                        @PluginContract(role = PluginContract.Role.BASE)
+                        public interface BasePlugin extends Plugin {
+                            int API_LEVEL = 1;
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/Intermediate.java",
+                    """
+                        package test;
+                        
+                        import %s;
+                        import %s;
+                        
+                        public interface Intermediate {
+                            String test();
+                        }
+                        """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                ),
+                source(
+                    "test/ExtendsIntermediate.java",
+                    """
+                        package test;
+                        
+                        import %s;
+                        
+                        @PluginContract(
+                            role = PluginContract.Role.CAPABILITY,
+                            requires = BasePlugin.class
+                        )
+                        public interface ExtendsIntermediate extends BasePlugin, Intermediate {
+                            int API_LEVEL = 2;
+                            
+                            default String test() {
+                                return "test";
+                            }
+                        }
+                        """.formatted(PluginContract.class.getCanonicalName())
+                )
+            ));
+            
+            assertTrue(result.success(), "Compilation should not fail");
         }
         
         @Test
