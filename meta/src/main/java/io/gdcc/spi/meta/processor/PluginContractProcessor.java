@@ -57,6 +57,22 @@ import java.util.TreeSet;
  *   <li>all required provider API levels.</li>
  * </ul>
  *
+ * <h3>Contract graph rules</h3>
+ *
+ * <p>The processor enforces a strict contract hierarchy:</p>
+ * <ul>
+ *   <li>A {@link PluginContract.Role#BASE base contract} is the unique, directly loadable identity
+ *       of a plugin. Base contracts may not extend other contracts and may not declare
+ *       {@code requires}.</li>
+ *   <li>A {@link PluginContract.Role#CAPABILITY capability contract} adds optional functionality.
+ *       It must declare exactly one base contract in {@code requires}. A capability may optionally
+ *       extend its required base contract in the Java type hierarchy to provide default
+ *       implementations for methods declared by the base. A capability may not extend another
+ *       capability.</li>
+ * </ul>
+ *
+ * <h3>Service registration</h3>
+ *
  * <p>Service registration generation is intentionally cautious. If any implementation of a given base
  * contract uses {@code @AutoService}, this processor suppresses generated service output for that
  * entire contract to avoid two processors writing the same {@code META-INF/services/...} file.</p>
@@ -224,6 +240,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
         return false;
     }
     
+    // ── Implementation processing ───────────────────────────────────────────────
+    
     /**
      * Processes one plugin implementation class.
      *
@@ -271,7 +289,7 @@ public final class PluginContractProcessor extends AbstractProcessor {
                 if (baseContract != null) {
                     error(
                         implementation,
-                        "Implementation must not implement multiple base plugin contracts: "
+                        "Implementation must implement exactly one Role.BASE @PluginContract, but implements: "
                             + baseContract.getQualifiedName() + " and " + contract.getQualifiedName()
                     );
                     throw new ProcessorException();
@@ -336,6 +354,9 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Validates the basic structural requirements for a plugin implementation.
+     *
+     * <p>A valid plugin implementation must be a public, non-abstract class. These constraints
+     * ensure that the ServiceLoader can instantiate the class at runtime.</p>
      *
      * @param implementation the implementation class to validate
      */
@@ -408,6 +429,44 @@ public final class PluginContractProcessor extends AbstractProcessor {
     }
     
     /**
+     * Validates that all contracts required by the current contract are also implemented
+     * by the plugin implementation class.
+     *
+     * <p>This ensures that a plugin implementing a capability also implements the capability's
+     * required base contract, which is the only loadable identity for the plugin.</p>
+     *
+     * @param implementation the concrete plugin implementation
+     * @param contract the contract currently being validated
+     * @param allImplementedContracts all discovered contracts of the implementation
+     * @param model the parsed model of the current contract
+     */
+    private void validateRequiredContracts(
+        TypeElement implementation,
+        TypeElement contract,
+        Set<TypeElement> allImplementedContracts,
+        PluginContractModel model
+    ) {
+        Set<String> implementedNames = new LinkedHashSet<>();
+        for (TypeElement implemented : allImplementedContracts) {
+            implementedNames.add(implemented.getQualifiedName().toString());
+        }
+        
+        for (TypeElement requiredContract : model.requiredContracts()) {
+            String requiredName = requiredContract.getQualifiedName().toString();
+            if (!implementedNames.contains(requiredName)) {
+                error(
+                    implementation,
+                    "Implementation of contract " + contract.getQualifiedName()
+                        + " also requires contract " + requiredName
+                );
+                throw new ProcessorException();
+            }
+        }
+    }
+    
+    // ── Type hierarchy inspection ───────────────────────────────────────────────
+    
+    /**
      * Traverses a type hierarchy and applies project-wide validation rules.
      *
      * <p>This method exists because the processor validates more than explicitly annotated
@@ -451,6 +510,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Applies validation rules to a single type discovered during hierarchy inspection.
      *
+     * <p>This method dispatches to specialized validators based on the nature of the type:
+     * contract interfaces, provider interfaces, and plugin implementation candidates each
+     * have their own set of rules.</p>
+     *
      * @param typeElement the type to inspect
      */
     private void inspectType(TypeElement typeElement) {
@@ -459,11 +522,12 @@ public final class PluginContractProcessor extends AbstractProcessor {
         
         if (isPluginInterfaceCandidate(typeElement)) {
             if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
-                error(typeElement, "Plugin interfaces must declare @PluginContract");
+                error(typeElement, "Interfaces extending Plugin must declare @PluginContract");
                 throw new ProcessorException();
             }
             
             validateApiLevelConstant(typeElement);
+            validateContractGraph(typeElement);
         }
         
         if (isProviderInterfaceCandidate(typeElement)) {
@@ -483,6 +547,341 @@ public final class PluginContractProcessor extends AbstractProcessor {
             processImplementation(typeElement);
         }
     }
+    
+    // ── Contract graph validation ───────────────────────────────────────────────
+    
+    /**
+     * Validates the contract graph rules for a {@code @PluginContract}-annotated interface.
+     *
+     * <p>This is the central method enforcing the structural rules of the contract hierarchy.
+     * It reads the contract's role and delegates to role-specific validation:</p>
+     *
+     * <ul>
+     *   <li><strong>BASE contracts</strong> may not declare {@code requires} and may not extend
+     *       other contracts.</li>
+     *   <li><strong>CAPABILITY contracts</strong> must declare exactly one base contract in
+     *       {@code requires}. They may optionally extend their required base contract in the
+     *       Java type hierarchy (to provide default implementations), but may not extend another
+     *       capability.</li>
+     * </ul>
+     *
+     * <p>Additionally, for capabilities, this method enforces package locality: the capability
+     * must reside in the same package or a subpackage of its required base contract.</p>
+     *
+     * @param contract the contract interface to validate
+     */
+    private void validateContractGraph(TypeElement contract) {
+        AnnotationMirror annotation = findAnnotationMirror(contract, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION);
+        if (annotation == null) {
+            return;
+        }
+        
+        PluginContract.Role role = readContractRole(annotation, contract);
+        List<TypeElement> requiredContracts = readClassArrayAnnotationValue(annotation, "requires");
+        
+        // Collect all parent types that are themselves plugin contracts. This is used to enforce
+        // the extension rules: which contracts may extend which other contracts.
+        List<TypeElement> extendedContracts = findExtendedPluginContracts(contract);
+        
+        if (role == PluginContract.Role.BASE) {
+            validateBaseContractGraph(contract, requiredContracts, extendedContracts);
+        } else {
+            validateCapabilityContractGraph(contract, requiredContracts, extendedContracts);
+        }
+    }
+    
+    /**
+     * Validates the graph rules specific to a {@link PluginContract.Role#BASE base contract}.
+     *
+     * <p>Base contracts are the loading identities of plugins. They form the roots of the
+     * contract graph and therefore:</p>
+     * <ul>
+     *   <li>must not declare {@code requires} — they do not depend on other contracts,</li>
+     *   <li>must not extend other contracts — there can only be one loading identity per plugin.</li>
+     * </ul>
+     *
+     * @param contract the base contract being validated
+     * @param requiredContracts the contracts listed in the {@code requires} attribute
+     * @param extendedContracts parent contracts found in the Java type hierarchy
+     */
+    private void validateBaseContractGraph(
+        TypeElement contract,
+        List<TypeElement> requiredContracts,
+        List<TypeElement> extendedContracts
+    ) {
+        // Base contracts are self-contained loading identities and may not require other contracts.
+        if (!requiredContracts.isEmpty()) {
+            error(
+                contract,
+                "Base contract " + contract.getQualifiedName()
+                    + " may not require other contracts; only capabilities may declare requires"
+            );
+            throw new ProcessorException();
+        }
+        
+        // Base contracts must not extend other contracts. Allowing this would create ambiguous
+        // loading identities — the plugin loader would not know which base to register under.
+        if (!extendedContracts.isEmpty()) {
+            TypeElement parent = extendedContracts.get(0);
+            error(
+                contract,
+                "Contract " + parent.getQualifiedName()
+                    + " may not be extended by base contract " + contract.getQualifiedName()
+                    + "; base contracts must not extend other contracts"
+            );
+            throw new ProcessorException();
+        }
+    }
+    
+    /**
+     * Validates the graph rules specific to a {@link PluginContract.Role#CAPABILITY capability contract}.
+     *
+     * <p>Capabilities are non-loadable extensions. The rules ensure a clean, unambiguous graph:</p>
+     * <ul>
+     *   <li>A capability must require exactly one base contract.</li>
+     *   <li>A capability may extend its required base contract to provide default implementations
+     *       for methods declared by the base.</li>
+     *   <li>A capability may not extend another capability contract.</li>
+     *   <li>A capability must reside in the same package or a subpackage of its required base.</li>
+     * </ul>
+     *
+     * @param contract the capability contract being validated
+     * @param requiredContracts the contracts listed in the {@code requires} attribute
+     * @param extendedContracts parent contracts found in the Java type hierarchy
+     */
+    private void validateCapabilityContractGraph(
+        TypeElement contract,
+        List<TypeElement> requiredContracts,
+        List<TypeElement> extendedContracts
+    ) {
+        // A capability must require exactly one base contract. This links the capability to its
+        // loading identity and ensures the plugin loader can always resolve the plugin's kind.
+        TypeElement requiredBase = validateCapabilityRequires(contract, requiredContracts);
+        
+        // Validate the Java extends hierarchy: a capability may extend its required base, but
+        // must not extend any other contract (especially not another capability).
+        validateCapabilityExtensions(contract, extendedContracts, requiredBase);
+        
+        // Capabilities must be co-located with their base contract so that SPI authors maintain
+        // a cohesive package structure.
+        validatePackageLocality(contract, requiredBase);
+    }
+    
+    /**
+     * Validates the {@code requires} attribute of a capability contract.
+     *
+     * <p>A capability must require exactly one entry, and that entry must be a base contract
+     * interface — not a capability, not a class, and not the capability itself.</p>
+     *
+     * @param contract the capability contract being validated
+     * @param requiredContracts the contracts listed in the {@code requires} attribute
+     * @return the single required base contract
+     */
+    private TypeElement validateCapabilityRequires(
+        TypeElement contract,
+        List<TypeElement> requiredContracts
+    ) {
+        String errorMessage = "Capability contract %s must require single base @PluginContract interface".formatted(contract.getQualifiedName());
+        
+        // Exactly one entry is required. Zero entries, multiple entries, or entries that are
+        // not base contracts all fail with the same message.
+        if (requiredContracts.size() != 1) {
+            error(contract, errorMessage);
+            throw new ProcessorException();
+        }
+        
+        TypeElement required = requiredContracts.get(0);
+        
+        // The required type must be an interface (not a class) and must carry @PluginContract.
+        if (required.getKind() != ElementKind.INTERFACE) {
+            error(contract, errorMessage);
+            throw new ProcessorException();
+        }
+        
+        // Self-references are meaningless and would create a cycle.
+        if (required.getQualifiedName().contentEquals(contract.getQualifiedName())) {
+            error(contract, errorMessage);
+            throw new ProcessorException();
+        }
+        
+        // The required contract must be annotated with @PluginContract.
+        AnnotationMirror requiredAnnotation = findAnnotationMirror(
+            required, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION
+        );
+        if (requiredAnnotation == null) {
+            error(contract, errorMessage);
+            throw new ProcessorException();
+        }
+        
+        // The required contract must have the BASE role. Capabilities requiring other capabilities
+        // are not supported.
+        PluginContract.Role requiredRole = readContractRole(requiredAnnotation, required);
+        if (requiredRole != PluginContract.Role.BASE) {
+            error(contract, errorMessage);
+            throw new ProcessorException();
+        }
+        
+        return required;
+    }
+    
+    /**
+     * Validates the Java {@code extends} hierarchy of a capability contract.
+     *
+     * <p>A capability may extend its required base contract — this is the mechanism that allows
+     * the capability to provide default implementations for methods declared by the base, and
+     * Java's type system will correctly resolve them without requiring bridge methods in the
+     * plugin implementation class.</p>
+     *
+     * <p>However, a capability may not extend another capability contract. Capability-to-capability
+     * inheritance is not supported in the current model.</p>
+     *
+     * @param contract the capability contract being validated
+     * @param extendedContracts all parent types that are plugin contracts
+     * @param requiredBase the single required base contract from the {@code requires} attribute
+     */
+    private void validateCapabilityExtensions(
+        TypeElement contract,
+        List<TypeElement> extendedContracts,
+        TypeElement requiredBase
+    ) {
+        for (TypeElement parent : extendedContracts) {
+            AnnotationMirror parentAnnotation = findAnnotationMirror(
+                parent, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION
+            );
+            if (parentAnnotation == null) {
+                // Should not happen since findExtendedPluginContracts only returns annotated types,
+                // but guard defensively.
+                continue;
+            }
+            
+            PluginContract.Role parentRole = readContractRole(parentAnnotation, parent);
+            
+            if (parentRole == PluginContract.Role.CAPABILITY) {
+                // Capability-to-capability extension is not allowed. Each capability is a
+                // standalone extension point attached to a base contract.
+                error(
+                    contract,
+                    "Contract " + parent.getQualifiedName()
+                        + " may not be extended by capability contract " + contract.getQualifiedName()
+                        + "; capabilities may not extend other capabilities"
+                );
+                throw new ProcessorException();
+            }
+            
+            if (parentRole == PluginContract.Role.BASE) {
+                // A capability may extend a base contract, but only if that base is the same one
+                // declared in requires. Extending an unrelated base would silently introduce a
+                // second loading identity into the hierarchy.
+                if (!parent.getQualifiedName().contentEquals(requiredBase.getQualifiedName())) {
+                    error(
+                        contract,
+                        "Capability contract " + contract.getQualifiedName()
+                            + " extends base contract " + parent.getQualifiedName()
+                            + " but requires " + requiredBase.getQualifiedName()
+                            + "; the extended base must match the required base"
+                    );
+                    throw new ProcessorException();
+                }
+                // Extension matches requires — this is the allowed case.
+            }
+        }
+        
+        // If the capability extends a base contract but does not declare it in requires, the
+        // contract graph would be inconsistent. Check the reverse: if the capability extends
+        // a base, that base must appear in requires (already validated above). But if the
+        // capability extends a base that is NOT in extendedContracts check, we need to also
+        // check: does the contract extend the required base without declaring requires?
+        // Actually, this direction is already covered: we validate requires first, and then
+        // check that any extended base matches requires. The remaining case is: the capability
+        // extends a base but forgot requires entirely — that's caught by validateCapabilityRequires.
+        
+        // Additional check: if the capability extends a base contract in its Java type hierarchy,
+        // that base MUST be declared in requires. This handles the case where the capability
+        // extends a base but declares a different (or no) base in requires.
+        for (TypeElement parent : extendedContracts) {
+            AnnotationMirror parentAnnotation = findAnnotationMirror(
+                parent, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION
+            );
+            if (parentAnnotation == null) {
+                continue;
+            }
+            PluginContract.Role parentRole = readContractRole(parentAnnotation, parent);
+            if (parentRole == PluginContract.Role.BASE
+                && !parent.getQualifiedName().contentEquals(requiredBase.getQualifiedName())) {
+                error(
+                    contract,
+                    "Capability contract " + contract.getQualifiedName()
+                        + " must require extended base contract interface " + parent.getQualifiedName()
+                );
+                throw new ProcessorException();
+            }
+        }
+    }
+    
+    /**
+     * Finds all direct parent interfaces of the given contract that are themselves plugin contracts.
+     *
+     * <p>This only looks at the directly declared {@code extends} clause of the interface, not at
+     * transitive ancestors. The common super-interface {@code Plugin} is excluded because it is
+     * a framework marker, not a contract.</p>
+     *
+     * @param contract the contract interface to inspect
+     * @return parent types that carry {@code @PluginContract}, in declaration order
+     */
+    private List<TypeElement> findExtendedPluginContracts(TypeElement contract) {
+        List<TypeElement> result = new ArrayList<>();
+        for (TypeMirror iface : contract.getInterfaces()) {
+            TypeElement parent = asTypeElement(iface);
+            if (parent == null) {
+                continue;
+            }
+            
+            // Skip the Plugin marker interface — it is a framework type, not a contract.
+            if (parent.getQualifiedName().contentEquals(ProcessorConstants.PLUGIN_INTERFACE)) {
+                continue;
+            }
+            
+            // Only consider interfaces that are annotated with @PluginContract.
+            if (findAnnotationMirror(parent, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) != null) {
+                result.add(parent);
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Validates that the capability resides in the same package or a subpackage of its required
+     * base contract.
+     *
+     * <p>This rule enforces package locality for SPI cohesion: capabilities should be defined
+     * close to their base contract so that related contracts form a coherent API surface.</p>
+     *
+     * @param capability the capability contract being validated
+     * @param requiredBase the required base contract
+     */
+    private void validatePackageLocality(TypeElement capability, TypeElement requiredBase) {
+        String capabilityPackage = getPackageName(capability);
+        String basePackage = getPackageName(requiredBase);
+        
+        // The capability must be in the same package or a subpackage of the base.
+        // "test.export.xml".startsWith("test.export.") covers subpackages.
+        // Direct equality covers the same-package case.
+        boolean sameOrSubpackage = capabilityPackage.equals(basePackage)
+            || capabilityPackage.startsWith(basePackage + ".");
+        
+        if (!sameOrSubpackage) {
+            error(
+                capability,
+                "Capability contract " + capability.getQualifiedName()
+                    + " and its required base contract " + requiredBase.getQualifiedName()
+                    + " must share same package path; " + capabilityPackage
+                    + " is not within " + basePackage
+            );
+            throw new ProcessorException();
+        }
+    }
+    
+    // ── Direct base type validation ─────────────────────────────────────────────
     
     /**
      * Rejects direct implementations of the foundational base types {@code Plugin} and
@@ -537,83 +936,15 @@ public final class PluginContractProcessor extends AbstractProcessor {
         return false;
     }
     
-    /**
-     * Determines whether a type qualifies as an implementation candidate for a plugin.
-     *
-     * @param typeElement the type to inspect
-     * @return {@code true} if the type is a concrete class implementing {@code Plugin}
-     */
-    private boolean isPluginImplementationCandidate(TypeElement typeElement) {
-        if (typeElement.getKind() != ElementKind.CLASS) {
-            return false;
-        }
-        if (typeElement.getModifiers().contains(Modifier.ABSTRACT)) {
-            return false;
-        }
-        return implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE) && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
-    }
+    // ── @PluginContract usage validation ────────────────────────────────────────
     
     /**
-     * Determines whether a type is a plugin interface candidate that must declare {@code @PluginContract}.
+     * Verifies that {@code @PluginContract} is only used on interfaces that extend {@code Plugin}.
      *
-     * @param typeElement the type to inspect
-     * @return {@code true} if the type is an interface extending {@code Plugin}
-     */
-    private boolean isPluginInterfaceCandidate(TypeElement typeElement) {
-        return typeElement.getKind() == ElementKind.INTERFACE
-            && implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)
-            && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
-    }
-    
-    /**
-     * Determines whether a type is a provider interface candidate that must declare {@code API_LEVEL}.
-     *
-     * @param typeElement the type to inspect
-     * @return {@code true} if the type is an interface extending {@code CoreProvider}
-     */
-    private boolean isProviderInterfaceCandidate(TypeElement typeElement) {
-        return typeElement.getKind() == ElementKind.INTERFACE
-            && implementsType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE)
-            && !isExactType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE);
-    }
-    
-    /**
-     * Tests whether the given type is assignable to another type identified by fully qualified name.
-     *
-     * @param typeElement the source type
-     * @param targetTypeName the fully qualified target type name
-     * @return {@code true} if the source type is assignable to the target type
-     */
-    private boolean implementsType(TypeElement typeElement, String targetTypeName) {
-        TypeElement targetType = elements.getTypeElement(targetTypeName);
-        if (targetType == null) {
-            return false;
-        }
-        
-        return types.isAssignable(
-            types.erasure(typeElement.asType()),
-            types.erasure(targetType.asType())
-        );
-    }
-    
-    /**
-     * Checks whether the given type is exactly the named type itself, not merely a subtype.
-     *
-     * @param typeElement the type to inspect
-     * @param targetTypeName the fully qualified target type name
-     * @return {@code true} if both names are identical
-     */
-    private boolean isExactType(TypeElement typeElement, String targetTypeName) {
-        return typeElement.getQualifiedName().contentEquals(targetTypeName);
-    }
-    
-    /**
-     * Verifies that {@code @PluginContract} is only used on interfaces.
-     *
-     * <p>Although the annotation is intended for SPI interfaces, Java's annotation target model
-     * cannot express "interfaces only". This processor therefore enforces the rule explicitly and
-     * fails compilation when the annotation is placed on classes, enums, records, or other
-     * non-interface types.</p>
+     * <p>Although the annotation targets {@code ElementType.TYPE}, Java's annotation target model
+     * cannot express "interfaces extending Plugin only". This processor therefore enforces the
+     * rule explicitly and fails compilation when the annotation is placed on classes, enums,
+     * records, or interfaces that do not extend {@code Plugin}.</p>
      *
      * @param typeElement the type currently being inspected
      */
@@ -622,39 +953,25 @@ public final class PluginContractProcessor extends AbstractProcessor {
             return;
         }
         
-        if (typeElement.getKind() != ElementKind.INTERFACE) {
-            error(typeElement, "@PluginContract may only be declared on interfaces");
+        // @PluginContract must be on an interface that extends Plugin.
+        if (typeElement.getKind() != ElementKind.INTERFACE
+            || !implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)) {
+            error(
+                typeElement,
+                "@PluginContract may only be declared on interfaces extending Plugin"
+            );
             throw new ProcessorException();
         }
     }
     
-    /**
-     * Determines whether the given type is a plugin contract.
-     *
-     * <p>A type qualifies as a plugin contract only when it is annotated with
-     * {@code @PluginContract} and is assignable to the common plugin super-interface.</p>
-     *
-     * @param typeElement the type to test
-     * @return {@code true} if the type is a plugin contract
-     */
-    private boolean isPluginContract(TypeElement typeElement) {
-        if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
-            return false;
-        }
-        
-        TypeElement pluginType = elements.getTypeElement(ProcessorConstants.PLUGIN_INTERFACE);
-        if (pluginType == null) {
-            return false;
-        }
-        
-        return types.isAssignable(
-            types.erasure(typeElement.asType()),
-            types.erasure(pluginType.asType())
-        );
-    }
+    // ── Contract model reading ──────────────────────────────────────────────────
     
     /**
      * Reads and validates the metadata of one plugin contract interface.
+     *
+     * <p>This extracts the role, required contracts, and provider dependencies from the
+     * {@code @PluginContract} annotation. It also validates the presence and correctness
+     * of the {@code API_LEVEL} compile-time constant.</p>
      *
      * @param contract the contract interface
      * @return the extracted in-memory contract model
@@ -677,6 +994,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Reads the {@code role} member of a {@code @PluginContract} annotation.
+     *
+     * <p>During annotation processing, enum-valued annotation members appear as
+     * {@link VariableElement} instances. This method extracts the constant name and
+     * maps it back to the {@link PluginContract.Role} enum.</p>
      *
      * @param annotation the contract annotation mirror
      * @param contract the annotated contract, used for diagnostics
@@ -703,6 +1024,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
     }
     
+    // ── API level validation ────────────────────────────────────────────────────
+    
     /**
      * Verifies that the given type declares a valid compile-time constant {@code API_LEVEL} field.
      *
@@ -714,6 +1037,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Reads a compile-time {@code int} constant from a type.
+     *
+     * <p>The field must be a primitive {@code int} with a compile-time constant value.
+     * Boxed {@code Integer} fields or fields initialized with method calls do not qualify
+     * because their values are not available to the annotation processor at compile time.</p>
      *
      * @param type the owning type
      * @param fieldName the field to locate
@@ -737,40 +1064,14 @@ public final class PluginContractProcessor extends AbstractProcessor {
         throw new ProcessorException();
     }
     
-    /**
-     * Validates that all contracts required by the current contract are also implemented.
-     *
-     * @param implementation the concrete plugin implementation
-     * @param contract the contract currently being validated
-     * @param allImplementedContracts all discovered contracts of the implementation
-     * @param model the parsed model of the current contract
-     */
-    private void validateRequiredContracts(
-        TypeElement implementation,
-        TypeElement contract,
-        Set<TypeElement> allImplementedContracts,
-        PluginContractModel model
-    ) {
-        Set<String> implementedNames = new LinkedHashSet<>();
-        for (TypeElement implemented : allImplementedContracts) {
-            implementedNames.add(implemented.getQualifiedName().toString());
-        }
-        
-        for (TypeElement requiredContract : model.requiredContracts()) {
-            String requiredName = requiredContract.getQualifiedName().toString();
-            if (!implementedNames.contains(requiredName)) {
-                error(
-                    implementation,
-                    "Implementation of contract " + contract.getQualifiedName()
-                        + " also requires contract " + requiredName
-                );
-                throw new ProcessorException();
-            }
-        }
-    }
+    // ── Provider handling ───────────────────────────────────────────────────────
     
     /**
      * Resolves the API levels of all providers required by the current contract.
+     *
+     * <p>Each provider type referenced in a {@code @RequiredProvider} annotation must be an
+     * interface extending {@code CoreProvider} and must declare a compile-time {@code API_LEVEL}
+     * constant.</p>
      *
      * @param providerTypes the provider interfaces referenced by the contract annotation
      * @param implementation the concrete implementation being processed, used for diagnostics
@@ -832,8 +1133,13 @@ public final class PluginContractProcessor extends AbstractProcessor {
         });
     }
     
+    // ── AutoService detection ───────────────────────────────────────────────────
+    
     /**
      * Checks whether the implementation class uses {@code @AutoService}.
+     *
+     * <p>The processor does not depend on AutoService directly. It merely detects the annotation
+     * by name so it can avoid generating conflicting ServiceLoader resources.</p>
      *
      * @param implementation the implementation class
      * @return {@code true} if {@code @AutoService} is present
@@ -841,6 +1147,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
     private boolean hasAutoServiceAnnotation(TypeElement implementation) {
         return findAnnotationMirror(implementation, ProcessorConstants.AUTO_SERVICE_ANNOTATION) != null;
     }
+    
+    // ── Resource generation ─────────────────────────────────────────────────────
     
     /**
      * Writes all accumulated generated resources after processing is complete.
@@ -888,7 +1196,9 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Writes one ServiceLoader registration file for a base contract.
-     * This is simply a re-implementation of what we did before with @AutoService and their processor
+     *
+     * <p>This replaces the need for {@code @AutoService} on plugin implementations. The generated
+     * file follows the standard {@code META-INF/services/} convention.</p>
      *
      * @param serviceTypeName the fully qualified name of the service interface
      * @param implementations the implementation class names to register
@@ -914,8 +1224,131 @@ public final class PluginContractProcessor extends AbstractProcessor {
         }
     }
     
+    // ── Type candidate checks ───────────────────────────────────────────────────
+    
+    /**
+     * Determines whether a type qualifies as an implementation candidate for a plugin.
+     *
+     * <p>A candidate is a concrete (non-abstract) class that implements {@code Plugin} through
+     * some contract interface. Abstract base classes are intentionally excluded — they may exist
+     * as shared implementation helpers without needing {@code @DataversePlugin}.</p>
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is a concrete class implementing {@code Plugin}
+     */
+    private boolean isPluginImplementationCandidate(TypeElement typeElement) {
+        if (typeElement.getKind() != ElementKind.CLASS) {
+            return false;
+        }
+        if (typeElement.getModifiers().contains(Modifier.ABSTRACT)) {
+            return false;
+        }
+        return implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)
+            && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
+    }
+    
+    /**
+     * Determines whether a type is a plugin interface candidate that must declare {@code @PluginContract}.
+     *
+     * <p>Any interface extending {@code Plugin} (other than {@code Plugin} itself) is expected to
+     * be a contract interface and must carry the {@code @PluginContract} annotation.</p>
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is an interface extending {@code Plugin}
+     */
+    private boolean isPluginInterfaceCandidate(TypeElement typeElement) {
+        return typeElement.getKind() == ElementKind.INTERFACE
+            && implementsType(typeElement, ProcessorConstants.PLUGIN_INTERFACE)
+            && !isExactType(typeElement, ProcessorConstants.PLUGIN_INTERFACE);
+    }
+    
+    /**
+     * Determines whether a type is a provider interface candidate that must declare {@code API_LEVEL}.
+     *
+     * @param typeElement the type to inspect
+     * @return {@code true} if the type is an interface extending {@code CoreProvider}
+     */
+    private boolean isProviderInterfaceCandidate(TypeElement typeElement) {
+        return typeElement.getKind() == ElementKind.INTERFACE
+            && implementsType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE)
+            && !isExactType(typeElement, ProcessorConstants.CORE_PROVIDER_INTERFACE);
+    }
+    
+    /**
+     * Determines whether the given type is a plugin contract.
+     *
+     * <p>A type qualifies as a plugin contract only when it is annotated with
+     * {@code @PluginContract} and is assignable to the common plugin super-interface.</p>
+     *
+     * @param typeElement the type to test
+     * @return {@code true} if the type is a plugin contract
+     */
+    private boolean isPluginContract(TypeElement typeElement) {
+        if (findAnnotationMirror(typeElement, ProcessorConstants.PLUGIN_CONTRACT_ANNOTATION) == null) {
+            return false;
+        }
+        
+        TypeElement pluginType = elements.getTypeElement(ProcessorConstants.PLUGIN_INTERFACE);
+        if (pluginType == null) {
+            return false;
+        }
+        
+        return types.isAssignable(
+            types.erasure(typeElement.asType()),
+            types.erasure(pluginType.asType())
+        );
+    }
+    
+    // ── Type system helpers ─────────────────────────────────────────────────────
+    
+    /**
+     * Tests whether the given type is assignable to another type identified by fully qualified name.
+     *
+     * @param typeElement the source type
+     * @param targetTypeName the fully qualified target type name
+     * @return {@code true} if the source type is assignable to the target type
+     */
+    private boolean implementsType(TypeElement typeElement, String targetTypeName) {
+        TypeElement targetType = elements.getTypeElement(targetTypeName);
+        if (targetType == null) {
+            return false;
+        }
+        
+        return types.isAssignable(
+            types.erasure(typeElement.asType()),
+            types.erasure(targetType.asType())
+        );
+    }
+    
+    /**
+     * Checks whether the given type is exactly the named type itself, not merely a subtype.
+     *
+     * @param typeElement the type to inspect
+     * @param targetTypeName the fully qualified target type name
+     * @return {@code true} if both names are identical
+     */
+    private boolean isExactType(TypeElement typeElement, String targetTypeName) {
+        return typeElement.getQualifiedName().contentEquals(targetTypeName);
+    }
+    
+    /**
+     * Extracts the package name from a type element.
+     *
+     * @param typeElement the type whose package to determine
+     * @return the fully qualified package name
+     */
+    private String getPackageName(TypeElement typeElement) {
+        return elements.getPackageOf(typeElement).getQualifiedName().toString();
+    }
+    
+    // ── Annotation mirror helpers ───────────────────────────────────────────────
+    
     /**
      * Finds an annotation mirror on the given element by fully qualified annotation type name.
+     *
+     * <p>Annotation mirrors are the compile-time representation of annotations. Unlike
+     * {@code getAnnotation()}, mirrors work reliably during annotation processing even when
+     * the annotation class is being compiled in the same round.</p>
      *
      * @param element the annotated element
      * @param annotationTypeName the fully qualified annotation type name
@@ -934,6 +1367,9 @@ public final class PluginContractProcessor extends AbstractProcessor {
     
     /**
      * Resolves one annotation member value, including defaults.
+     *
+     * <p>Uses {@code Elements.getElementValuesWithDefaults()} so that annotation members with
+     * default values are visible even when not explicitly set by the author.</p>
      *
      * @param annotation the annotation mirror
      * @param memberName the member to resolve
@@ -1052,6 +1488,10 @@ public final class PluginContractProcessor extends AbstractProcessor {
     /**
      * Converts a declared type mirror into its corresponding type element.
      *
+     * <p>During annotation processing, types are represented as {@link TypeMirror} instances.
+     * This utility extracts the underlying {@link TypeElement} when the mirror represents a
+     * declared (class/interface) type.</p>
+     *
      * @param typeMirror the type mirror to convert
      * @return the type element, or {@code null} if the mirror is not a declared type
      */
@@ -1064,8 +1504,13 @@ public final class PluginContractProcessor extends AbstractProcessor {
         return element instanceof TypeElement typeElement ? typeElement : null;
     }
     
+    // ── Ordering helpers ────────────────────────────────────────────────────────
+    
     /**
      * Returns the given types sorted by fully qualified name for deterministic processing order.
+     *
+     * <p>Sorting ensures that error messages and generated output are stable across compiler
+     * runs regardless of the order in which the compiler discovers types.</p>
      *
      * @param typesToSort the types to sort
      * @return a sorted list view
@@ -1075,6 +1520,8 @@ public final class PluginContractProcessor extends AbstractProcessor {
             .sorted(Comparator.comparing(type -> type.getQualifiedName().toString()))
             .toList();
     }
+    
+    // ── Diagnostic helpers ──────────────────────────────────────────────────────
     
     /**
      * Emits a compiler error message associated with a source element.
@@ -1096,8 +1543,13 @@ public final class PluginContractProcessor extends AbstractProcessor {
         processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, message, element);
     }
     
+    // ── Internal model ──────────────────────────────────────────────────────────
+    
     /**
-     * Internal in-memory representation of one contract interface.
+     * Internal in-memory representation of one contract interface's annotation metadata.
+     *
+     * <p>This record captures the parsed state of a {@code @PluginContract} annotation for
+     * use during validation and descriptor generation.</p>
      *
      * @param role whether the contract is a base contract or a capability
      * @param requiredContracts contracts that must also be implemented
