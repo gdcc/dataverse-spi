@@ -32,19 +32,20 @@ public final class DescriptorScanner {
      *             a JAR file, its internal entries will be scanned for descriptors.
      * @return a list of {@code SourcedPluginDescriptor} objects representing plugin descriptors
      *         found at the given path. The list will be empty if no descriptors are found.
-     * @throws IllegalArgumentException if the provided {@code path} is {@code null}.
+     * @throws IllegalArgumentException if the provided {@code path} is {@code null} or scanning fails for other reasons caused by user.
      * @throws IOException if an I/O error occurs while accessing the specified path or its contents.
      */
     public static List<SourcedDescriptor> scanPath(Path path) throws IOException {
         List<SourcedDescriptor> scanResult = new ArrayList<>();
         
         if (path == null) {
-            throw new IllegalArgumentException("Set of paths may not contain null values");
+            throw new IllegalArgumentException("Path may not be null");
         }
         if (Files.isDirectory(path)) {
             scanDirectory(path).forEach(plugin -> scanResult.add(new SourcedDescriptor(path, plugin)));
+        } else {
+            scanJar(path).forEach(plugin -> scanResult.add(new SourcedDescriptor(path, plugin)));
         }
-        scanJar(path).forEach(plugin -> scanResult.add(new SourcedDescriptor(path, plugin)));
         
         return List.copyOf(scanResult);
     }
