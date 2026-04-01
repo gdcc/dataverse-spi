@@ -54,6 +54,7 @@
         <jdk.version>17</jdk.version>
         <project.license.name>Apache License, Version 2.0</project.license.name>
         <project.license.url>https://www.apache.org/licenses/LICENSE-2.0.txt</project.license.url>
+        <docs.site.base>/</docs.site.base>
     </properties>
     
     <dependencyManagement>
@@ -134,7 +135,7 @@
                     <!-- Create a banner on top of every page allowing to return to main docs page   -->
                     <top><![CDATA[
                         <div class="top-nav-backlink">
-                            <a href="../index.html">← Back to Dataverse SPI Plugin API homepage</a>
+                            <a href="${docs.site.base}index.html">← Back to Dataverse SPI Plugin API homepage</a>
                         </div>
                     ]]></top>
                     <bottom><![CDATA[
@@ -142,7 +143,7 @@
                             Version ${project.version} -&nbsp;
                             Copyright by ${project.organization.name} -&nbsp;
                             Licensed under <a href="${project.license.url}" target="_blank">${project.license.name}</a> |&nbsp;
-                            <a href="../index.html">Dataverse SPI Plugin API</a> |&nbsp;
+                            <a href="${docs.site.base}index.html">Dataverse SPI Plugin API</a> |&nbsp;
                             <a href="https://dataverse.org" target="_blank">The Dataverse Project</a>
                         </div>
                     ]]></bottom>

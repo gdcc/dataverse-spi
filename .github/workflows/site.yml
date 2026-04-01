@@ -28,8 +28,12 @@ jobs:
           java-version: '17'
           cache: maven
 
+      # Later on, we need to extend this mechanism to provide both version and snapshot,
+      # as well as a different case the stable version and "latest".
       - name: Build and verify project site
-        run: mvn -B verify site
+        # By default, docs.site.base is / for local development. For deployment, this needs to be adapted.
+        # IMPORTANT: make sure the base ends with "/"!
+        run: mvn -B verify site -Ddocs.site.base=/dataverse-spi/snapshot/
 
       - name: Add .nojekyll
         run: touch target/site/.nojekyll
