@@ -1,0 +1,50 @@
+<site xmlns="http://maven.apache.org/SITE/2.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0 https://maven.apache.org/xsd/site-2.0.0.xsd"
+      name="${project.name}">
+    
+    <skin>
+        <groupId>org.sentrysoftware.maven</groupId>
+        <artifactId>sentry-maven-skin</artifactId>
+        <version>8.0.00</version>
+    </skin>
+    
+    <bannerLeft name="${project.organization.name}" href="${project.organization.url}">
+        <image src="images/gdcc-logo.png" alt="${project.organization.name}"/>
+    </bannerLeft>
+    <bannerRight name="The Dataverse Project" href="https://dataverse.org/">
+        <image src="images/dataverse-logo.png" alt="The Dataverse Project"/>
+    </bannerRight>
+    
+    <custom>
+        <!-- Skin settings (see https://sentrysoftware.org/sentry-maven-skin/settings.html) -->
+        <keywords>dataverse, plugin, spi, api</keywords>
+        <bodyClass>sentry-orange</bodyClass>
+        
+        <social>
+            <custom>
+                <icon>fa-brands fa-github</icon>
+                <title>Check out the project on GitHub</title>
+                <href>${project.scm.url}</href>
+            </custom>
+            <custom>
+                <icon>fa-brands fa-zulip</icon>
+                <title>Join us on Zulip</title>
+                <href>https://dataverse.zulipchat.com</href>
+            </custom>
+        </social>
+    </custom>
+    
+    <body>
+        <menu name="Getting Started">
+            <item name="Overview" href="index.html"/>
+            <item name="Examples" href="examples.html"/>
+            <item name="Team" href="team.html"/>
+        </menu>
+        <menu name="Technical Details">
+            <item name="Modules" href="modules.html"/>
+            <item name="JavaDocs" href="apidocs/index.html"/>
+        </menu>
+    </body>
+
+</site>
