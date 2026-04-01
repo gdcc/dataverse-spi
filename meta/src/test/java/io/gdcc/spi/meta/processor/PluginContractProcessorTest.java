@@ -1764,6 +1764,27 @@ class PluginContractProcessorTest {
             Descriptor descriptor = DescriptorFormat.read(Files.readString(result.generatedFile(descriptorPath)));
             assertEquals(8, descriptor.requiredProviderLevel("test.SharedProvider"));
         }
+        
+        @Test
+        void failsWhenProviderIsNonPublicInterface() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/NonPublicProvider.java",
+                    """
+                    package test;
+
+                    import %s;
+
+                    interface NonPublicProvider extends CoreProvider {
+                        int API_LEVEL = 8;
+                    }
+                    """.formatted(CoreProvider.class.getCanonicalName())
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "Interfaces extending CoreProvider must be public");
+        }
     }
     
     @Nested
@@ -1906,6 +1927,32 @@ class PluginContractProcessorTest {
             
             assertFalse(result.success(), "Compilation should fail");
             assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "@PluginContract may only be declared on interfaces extending Plugin");
+        }
+        
+        @Test
+        void failsWhenContractIsOnNonPublicInterface() throws IOException {
+            ProcessorTestCompiler.CompilationResult result = compiler.compile(List.of(
+                source(
+                    "test/NotPublicPlugin.java",
+                    """
+                    package test;
+
+                    import %s;
+                    import %s;
+
+                    @PluginContract(role = PluginContract.Role.BASE)
+                    interface NotPublicPlugin extends Plugin {
+                        int API_LEVEL = 3;
+                    }
+                    """.formatted(
+                        Plugin.class.getCanonicalName(),
+                        PluginContract.class.getCanonicalName()
+                    )
+                )
+            ));
+            
+            assertFalse(result.success(), "Compilation should fail");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "Interfaces extending Plugin must be public");
         }
         
         @Test

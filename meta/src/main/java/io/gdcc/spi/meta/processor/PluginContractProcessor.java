@@ -532,11 +532,19 @@ public final class PluginContractProcessor extends AbstractProcessor {
                 throw new ProcessorException();
             }
             
+            if (!typeElement.getModifiers().contains(Modifier.PUBLIC)) {
+                error(typeElement, "Interfaces extending Plugin must be public");
+            }
+            
             validateApiLevelConstant(typeElement);
             validateContractGraph(typeElement);
         }
         
         if (isProviderInterfaceCandidate(typeElement)) {
+            if (!typeElement.getModifiers().contains(Modifier.PUBLIC)) {
+                error(typeElement, "Interfaces extending CoreProvider must be public");
+            }
+            
             validateApiLevelConstant(typeElement);
         }
         
