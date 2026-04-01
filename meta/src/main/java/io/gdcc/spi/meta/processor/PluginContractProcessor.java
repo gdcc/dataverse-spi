@@ -49,6 +49,12 @@ import java.util.TreeSet;
  *   <li>a {@code META-INF/services/...} entry for the base plugin contract when safe to do so.</li>
  * </ol>
  *
+ * <p>Note:
+ *    The processor enforces contract rules for all top-level and member interfaces in compiled source files.
+ *    Runtime validation of contracts in PluginLoader loaded from external JARs or assembled outside normal compilation
+ *    will catch illegal usage the processor cannot see and validate (like anonymous or method body interfaces).
+ * </p>
+ *
  * <p>The descriptor captures the build-time view of:</p>
  * <ul>
  *   <li>the plugin implementation class,</li>

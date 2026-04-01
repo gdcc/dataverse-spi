@@ -3,6 +3,7 @@ package io.gdcc.spi.core.loader;
 import io.gdcc.spi.core.test.basic.TestContract;
 import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.descriptor.DescriptorFormat;
+import io.gdcc.spi.meta.plugin.Plugin;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -31,13 +32,13 @@ class PluginLoaderTest {
         }
         
         @Test
-        void validatePluginBaseClass_invalidBaseClass_missingAnnotation() {
+        void validatePluginBaseClass_invalidBaseClass_unrelated() {
             // Given
-            interface MissingAnnotationPlugin {
+            interface UnrelatedInterfaceNotExtendingPlugin {
             }
             
             // When & Then
-            assertThrows(IllegalArgumentException.class, () -> PluginLoader.validatePluginBaseClass(MissingAnnotationPlugin.class));
+            assertThrows(IllegalArgumentException.class, () -> PluginLoader.validatePluginBaseClass(UnrelatedInterfaceNotExtendingPlugin.class));
         }
         
         @Test
@@ -52,9 +53,15 @@ class PluginLoaderTest {
         
         @Test
         void validatePluginBaseClass_invalidBaseClass_wrongRole() {
+
+            // NOTE:
+            // This local interface bypasses the annotation processor intentionally.
+            // The processor would reject this at compile time in real source files.
+            // This test verifies the runtime validation in PluginLoader.
+            
             // Given
             @PluginContract(role = PluginContract.Role.CAPABILITY)
-            interface IncorrectRolePlugin {
+            interface IncorrectRolePlugin extends Plugin {
             }
             
             // When & Then
