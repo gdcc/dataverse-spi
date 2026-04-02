@@ -1,8 +1,11 @@
 package io.gdcc.spi.core.loader;
 
 import io.gdcc.spi.core.compiler.LoaderTestEnvironment;
+import io.gdcc.spi.meta.plugin.Plugin;
 import io.gdcc.spi.meta.processor.PluginContractProcessor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Path;
 
@@ -11,58 +14,68 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PluginLoaderIntegrationTest {
-
-    @Test
-    void rejectsPluginCompiledAgainstNewerBaseApiLevel() throws Exception {
-        // Given
-        
-        String baseContract = """
-                package test.spi;
+    
+    final String contractPackage = "test.spi";
+    final String contractClass = "TestPlugin";
+    
+    final String pluginPackage = "test.plugins";
+    
+    final String baseContractClassFile = contractPackage.replace(".", "/") + "/" + contractClass + ".java";
+    final String baseContractCode = """
+                package %s;
 
                 import io.gdcc.spi.meta.plugin.Plugin;
                 import io.gdcc.spi.meta.annotations.PluginContract;
 
                 @PluginContract(role = PluginContract.Role.BASE)
-                public interface TestPlugin extends Plugin {
+                public interface %s extends Plugin {
                     int API_LEVEL = %s;
                 }
                 """;
-        
-        LoaderTestEnvironment env = LoaderTestEnvironment.builder()
-            .addCoreSource(
-                "test/spi/TestPlugin.java",
-                baseContract.formatted(1)
-            )
-            .addPluginSource(
-                "test/spi/TestPlugin.java",
-                baseContract.formatted(2)
-            )
-            .addPluginSource(
-                "test/plugins/NewerPlugin.java",
-                """
-                package test.plugins;
+    
+    final String pluginCodeTemplate = """
+                package %s;
 
                 import io.gdcc.spi.meta.annotations.DataversePlugin;
-                import test.spi.TestPlugin;
+                import %s.%s;
 
                 @DataversePlugin
-                public class NewerPlugin implements TestPlugin {
+                public class %s implements %s {
                     @Override
                     public String identity() {
-                        return "newer";
+                        return "test";
                     }
                 }
-                """
+                """;
+    
+    final String simplePluginClass = "SimplePlugin";
+    final String simplePluginClassFile = pluginPackage.replace(".", "/") + "/" + simplePluginClass +  ".java";
+    final String simplePluginCode = pluginCodeTemplate.formatted(pluginPackage, contractPackage, contractClass, simplePluginClass, contractClass);
+    
+    @ParameterizedTest
+    @CsvSource({"1,2","2,1"})
+    void rejectsPluginCompiledAgainstDifferentBaseApiLevel(int coreLevel, int pluginLevel) throws Exception {
+        // Given
+        LoaderTestEnvironment env = LoaderTestEnvironment.builder()
+            .addCoreSource(
+                baseContractClassFile,
+                baseContractCode.formatted(contractPackage, contractClass, coreLevel)
+            )
+            .addPluginSource(
+                baseContractClassFile,
+                baseContractCode.formatted(contractPackage, contractClass, pluginLevel)
+            )
+            .addPluginSource(
+                simplePluginClassFile,
+                simplePluginCode
             )
             .addPluginProcessor(new PluginContractProcessor())
             .packagePluginAsJar(false)
             .build();
 
-        Class<?> pluginContractClass = env.coreClassLoader().loadClass("test.spi.TestPlugin");
-
+        Class<?> pluginContractClass = env.coreClassLoader().loadClass(contractPackage + "." + contractClass);
         @SuppressWarnings("unchecked")
-        Class<io.gdcc.spi.meta.plugin.Plugin> typedContract =
-            (Class<io.gdcc.spi.meta.plugin.Plugin>) pluginContractClass;
+        Class<Plugin> typedContract = (Class<Plugin>) pluginContractClass;
 
         PluginLoader<?> loader = new PluginLoader<>(typedContract, env.coreClassLoader());
         Path pluginLocation = Path.of(env.pluginArtifact().toString());
@@ -71,5 +84,42 @@ class PluginLoaderIntegrationTest {
         var ex = assertThrows(LoaderException.class, () -> loader.load(pluginLocation));
         assertEquals(1, ex.getProblems().size());
         assertInstanceOf(LoaderProblem.PluginClassApiLevelMismatch.class, ex.getProblems().get(0));
+    }
+    
+    @Test
+    void acceptsPluginCompiledAgainstSameBaseApiLevel() throws Exception {
+        // Given
+        int apiLevel = 5;
+        
+        LoaderTestEnvironment env = LoaderTestEnvironment.builder()
+            .addCoreSource(
+                baseContractClassFile,
+                baseContractCode.formatted(contractPackage, contractClass, apiLevel)
+            )
+            .addPluginSource(
+                baseContractClassFile,
+                baseContractCode.formatted(contractPackage, contractClass, apiLevel)
+            )
+            .addPluginSource(
+                simplePluginClassFile,
+                simplePluginCode
+            )
+            .addPluginProcessor(new PluginContractProcessor())
+            .packagePluginAsJar(false)
+            .build();
+        
+        Class<?> pluginContractClass = env.coreClassLoader().loadClass(contractPackage + "." + contractClass);
+        @SuppressWarnings("unchecked")
+        Class<Plugin> typedContract = (Class<Plugin>) pluginContractClass;
+        
+        PluginLoader<?> loader = new PluginLoader<>(typedContract, env.coreClassLoader());
+        Path pluginLocation = Path.of(env.pluginArtifact().toString());
+        
+        // When
+        var plugins = loader.load(pluginLocation);
+        
+        // Then
+        assertEquals(1, plugins.size());
+        assertEquals(pluginPackage + "." + simplePluginClass, plugins.get(0).plugin().getClass().getName());
     }
 }
