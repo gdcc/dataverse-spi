@@ -307,10 +307,30 @@ class DescriptorFormatTest {
         }
         
         @Test
+        void read_FailsWhenContractLevelIsNegative() {
+            String serialized = """
+            plugin.class=io.gdcc.example.MyPlugin
+            plugin.kind=io.gdcc.example.ExportPlugin
+            plugin.implements.io.gdcc.example.ExportPlugin.level=-1
+            """;
+            
+            IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> DescriptorFormat.read(new StringReader(serialized))
+            );
+            
+            assertEquals(
+                "Invalid integer value for property plugin.implements.io.gdcc.example.ExportPlugin.level may not be < 1, but is: -1",
+                ex.getMessage()
+            );
+        }
+        
+        @Test
         void read_FailsWhenRequiredProviderLevelIsNotAnInteger() {
             String serialized = """
             plugin.class=io.gdcc.example.MyPlugin
             plugin.kind=io.gdcc.example.ExportPlugin
+            plugin.implements.io.gdcc.example.ExportPlugin.level=1
             plugin.requires.io.gdcc.example.ExportProvider.level=nope
             """;
             
@@ -321,6 +341,26 @@ class DescriptorFormatTest {
             
             assertEquals(
                 "Invalid integer value for property plugin.requires.io.gdcc.example.ExportProvider.level: nope",
+                ex.getMessage()
+            );
+        }
+        
+        @Test
+        void read_FailsWhenProviderLevelIsNegative() {
+            String serialized = """
+            plugin.class=io.gdcc.example.MyPlugin
+            plugin.kind=io.gdcc.example.ExportPlugin
+            plugin.implements.io.gdcc.example.ExportPlugin.level=1
+            plugin.requires.io.gdcc.example.ExportProvider.level=-1
+            """;
+            
+            IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> DescriptorFormat.read(new StringReader(serialized))
+            );
+            
+            assertEquals(
+                "Invalid integer value for property plugin.requires.io.gdcc.example.ExportProvider.level may not be < 1, but is: -1",
                 ex.getMessage()
             );
         }

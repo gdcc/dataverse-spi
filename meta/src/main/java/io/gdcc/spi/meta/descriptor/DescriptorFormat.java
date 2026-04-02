@@ -195,7 +195,10 @@ public final class DescriptorFormat {
         }
         
         try {
-            return Integer.parseInt(value);
+            int level = Integer.parseInt(value);
+            if (level < 1)
+                throw new IllegalArgumentException("Invalid integer value for property " + key + " may not be < 1, but is: " + value);
+            return level;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid integer value for property " + key + ": " + value, e);
         }
