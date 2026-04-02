@@ -1,7 +1,9 @@
 package io.gdcc.spi.meta.descriptor;
 
+import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -130,6 +132,98 @@ public final class DescriptorScanner {
         return List.copyOf(descriptors);
     }
     
-    // TODO: a method to check that for a given plugin class and plugin kind there is a service loader entry present
     
+    /**
+     * Checks whether the source referenced by the given descriptor contains a Java SPI service
+     * configuration file for the descriptor's declared kind, and whether that file explicitly
+     * lists the descriptor's implementation class.
+     *
+     * <p>The source location is expected to point either to a directory root or to a JAR file.
+     * In the directory case, this method looks for a regular file at
+     * {@code META-INF/services/<kind>} below that root. In the JAR case, it looks for the
+     * corresponding JAR entry.</p>
+     *
+     * <p>If the SPI record exists, its contents are interpreted using UTF-8. Blank lines,
+     * leading/trailing whitespace, and comments introduced by {@code #} are ignored in the
+     * same spirit as standard Java service configuration files.</p>
+     *
+     * @param descriptor the descriptor whose source and implementation metadata should be checked
+     * @return {@code true} if a matching SPI record exists and contains the descriptor's
+     *         implementation class; {@code false} if no such SPI record exists or the record
+     *         does not list that implementation
+     * @throws IllegalArgumentException if the descriptor points to a source location that does not exist
+     * @throws IOException if an I/O error occurs while reading the directory entry or JAR entry
+     */
+    public static boolean hasServiceProviderInterfaceRecord(SourcedDescriptor descriptor) throws IOException {
+        String spiLocation = "META-INF/services/" + descriptor.plugin().kind();
+        Path source = descriptor.sourceLocation();
+        
+        // The descriptor should already be vetted before reaching this point, so we keep validation
+        // intentionally lightweight here and only reject obviously invalid sources.
+        if (Files.notExists(source)) {
+            throw new IllegalArgumentException("Source descriptor contained non-existing source location " + source);
+        }
+        
+        // Strategy:
+        // - If the source is a directory, open the SPI file directly from the filesystem.
+        // - Otherwise, treat the source as an archive and look for the SPI record as a JAR entry.
+        // In both cases we funnel the actual content check through the same InputStream-based helper.
+        if (Files.isDirectory(source)) {
+            Path serviceFile = source.resolve(spiLocation);
+            
+            // No SPI record file at the expected location means there is nothing to match.
+            if (!Files.isRegularFile(serviceFile)) {
+                return false;
+            }
+            
+            // Open the regular file only for the duration of the content check.
+            try (InputStream serviceRecord = Files.newInputStream(serviceFile)) {
+                return spiRecordContains(serviceRecord, descriptor.plugin().klass());
+            }
+        }
+        
+        // Important: the JAR must stay open for as long as the entry InputStream is being read.
+        // Therefore, both resources are owned by nested try-with-resources blocks in the same scope.
+        try (JarFile jar = new JarFile(source.toFile())) {
+            JarEntry entry = jar.getJarEntry(spiLocation);
+            
+            // Missing JAR entry means there is no SPI record for the declared kind.
+            if (entry == null) {
+                return false;
+            }
+            
+            // Read the JAR entry while the JAR is still open, then close both resources automatically.
+            try (InputStream serviceRecord = jar.getInputStream(entry)) {
+                return spiRecordContains(serviceRecord, descriptor.plugin().klass());
+            }
+        }
+    }
+    
+    /**
+     * Reads a Java SPI service configuration stream and checks whether it declares the given implementation class.
+     *
+     * <p>Lines are normalized in a tolerant way: comments beginning with {@code #} are stripped,
+     * surrounding whitespace is trimmed, and empty lines are ignored.</p>
+     */
+    private static boolean spiRecordContains(InputStream serviceRecord, String implementationClass) throws IOException {
+        // This helper intentionally contains the shared parsing logic so that directory-based
+        // and JAR-based SPI records are interpreted in exactly the same way.
+        try (
+            InputStreamReader streamReader = new InputStreamReader(serviceRecord, StandardCharsets.UTF_8);
+            BufferedReader reader = new BufferedReader(streamReader)
+        ) {
+            return reader.lines()
+                // Strip inline comments to support standard SPI syntax.
+                .map(line -> {
+                    int commentStart = line.indexOf('#');
+                    return commentStart >= 0 ? line.substring(0, commentStart) : line;
+                })
+                // Normalize whitespace so that indented or padded entries still match.
+                .map(String::trim)
+                // Skip blank lines after normalization.
+                .filter(line -> !line.isEmpty())
+                // Finally, look for the implementation class declared by the descriptor.
+                .anyMatch(line -> line.equals(implementationClass));
+        }
+    }
 }

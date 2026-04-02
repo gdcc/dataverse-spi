@@ -251,7 +251,8 @@ public class PluginLoader<T extends Plugin> {
         logger.debug("Scanning for non-implementations results: {}", implementationResult);
         
         // 4. Verify that every plugin class has a service loader entry. Remove any affected from the list.
-        // TODO: implement here - or make it a part of the resolving process when the descriptors are loaded
+        var serviceProviderResult = LoaderHelper.verifyServiceProviderRecords(descriptors);
+        logger.debug("Scanning for SPI record results: {}", serviceProviderResult);
         
         // 5. Verify that the API level of the plugin matches the core-expected level(s).
         var apiLevelResult = LoaderHelper.verifyPluginApiLevels(descriptors, this.pluginClass, this.parentClassLoader);
@@ -261,7 +262,12 @@ public class PluginLoader<T extends Plugin> {
         // TODO: implement
         
         // Merge all the different results to receive the final picture which plugins are faulty
-        var finalResults = PluginValidationResult.merge(collisionResult, implementationResult, apiLevelResult);
+        var finalResults = PluginValidationResult.merge(
+            collisionResult,
+            implementationResult,
+            serviceProviderResult,
+            apiLevelResult
+        );
         // Merge all the problems into one large list, to be wrapped in an exception
         finalResults.rejected().forEach((descriptor, problems) -> sourceProblems.addAll(problems));
         

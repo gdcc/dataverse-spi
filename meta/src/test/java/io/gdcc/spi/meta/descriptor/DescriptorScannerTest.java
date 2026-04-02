@@ -14,14 +14,15 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DescriptorScannerTest {
-
+    
     @TempDir
     Path tempDir;
-
+    
     @Nested
     class Directory {
         
@@ -172,6 +173,100 @@ class DescriptorScannerTest {
             );
             
             assertTrue(ex.getMessage().contains("not a readable JAR file"));
+        }
+    }
+    
+    @Nested
+    class ServiceProviderInterfaceExistance {
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_ReturnTrue_ForExistingSPIRecordInJar() throws IOException {
+            Path jar = createJar(Map.of(
+                "META-INF/services/test.BasePlugin",
+                "test.Plugin",
+                "META-INF/dataverse/plugins/test.Plugin.properties",
+                """
+                    plugin.class=test.Plugin
+                    plugin.kind=test.BasePlugin
+                    plugin.implements.test.BasePlugin.level=2
+                    """
+            ));
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor sourcedDescriptor = new SourcedDescriptor(jar, descriptor);
+            
+            assertTrue(DescriptorScanner.hasServiceProviderInterfaceRecord(sourcedDescriptor));
+        }
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_ReturnsFalse_WhenSPIRecordDoesNotExistInJar() throws IOException {
+            Path jar = createJar(Map.of(
+                "META-INF/dataverse/plugins/test.Plugin.properties",
+                """
+                    plugin.class=test.Plugin
+                    plugin.kind=test.BasePlugin
+                    plugin.implements.test.BasePlugin.level=2
+                    """
+            ));
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor sourcedDescriptor = new SourcedDescriptor(jar, descriptor);
+            
+            assertFalse(DescriptorScanner.hasServiceProviderInterfaceRecord(sourcedDescriptor));
+        }
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_RejectsInvalidSourcedDescriptorJar() {
+            Path invalidPath = tempDir.resolve("invalid.jar");
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor invalidDescriptor = new SourcedDescriptor(invalidPath, descriptor);
+            
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> DescriptorScanner.hasServiceProviderInterfaceRecord(invalidDescriptor));
+            
+            assertTrue(ex.getMessage().contains("invalid.jar"));
+        }
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_ReturnsTrue_ForExistingSPIRecordInDirectory() throws IOException {
+            Path tmpDir = Files.createTempDirectory("descriptor-scanner");
+            Path recordsDir = tmpDir.resolve(Path.of("META-INF/services"));
+            
+            Files.createDirectories(recordsDir);
+            Files.writeString(recordsDir.resolve(Path.of("test.BasePlugin")), "test.Plugin", StandardCharsets.UTF_8);
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor sourcedDescriptor = new SourcedDescriptor(tmpDir, descriptor);
+            
+            assertTrue(DescriptorScanner.hasServiceProviderInterfaceRecord(sourcedDescriptor));
+        }
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_ReturnsFalse_ForNonexistingSPIRecordInDirectory() throws IOException {
+            Path tmpDir = Files.createTempDirectory("descriptor-scanner");
+            Path recordsDir = tmpDir.resolve(Path.of("META-INF/services"));
+            
+            Files.createDirectories(recordsDir);
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor sourcedDescriptor = new SourcedDescriptor(tmpDir, descriptor);
+            
+            assertFalse(DescriptorScanner.hasServiceProviderInterfaceRecord(sourcedDescriptor));
+        }
+        
+        @Test
+        void hasServiceProviderInterfaceRecord_ReturnsFalse_ForNonmatchingSPIRecordInDirectory() throws IOException {
+            Path tmpDir = Files.createTempDirectory("descriptor-scanner");
+            Path recordsDir = tmpDir.resolve(Path.of("META-INF/services"));
+            
+            Files.createDirectories(recordsDir);
+            Files.writeString(recordsDir.resolve(Path.of("test.BasePlugin")), "test.OtherPlugin", StandardCharsets.UTF_8);
+            
+            Descriptor descriptor = new Descriptor("test.Plugin", "test.BasePlugin", Map.of(), Map.of());
+            SourcedDescriptor sourcedDescriptor = new SourcedDescriptor(tmpDir, descriptor);
+            
+            assertFalse(DescriptorScanner.hasServiceProviderInterfaceRecord(sourcedDescriptor));
         }
     }
 

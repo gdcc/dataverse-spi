@@ -1,12 +1,14 @@
 package io.gdcc.spi.core.loader;
 
 import io.gdcc.spi.meta.descriptor.DescriptorFormat;
+import io.gdcc.spi.meta.descriptor.DescriptorScanner;
 import io.gdcc.spi.meta.descriptor.PluginDescriptor;
 import io.gdcc.spi.meta.descriptor.SourcedDescriptor;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import io.gdcc.spi.meta.plugin.Plugin;
 import io.gdcc.spi.meta.processor.ProcessorConstants;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -220,6 +222,47 @@ final class LoaderHelper {
             Set.copyOf(accepted),
             PluginValidationResult.copyProblemMap(rejected),
             PluginValidationResult.copyProblemMap(warning)
+        );
+    }
+    
+    
+    /**
+     * Verifies service provider records in the provided list of descriptors.
+     * This method examines each descriptor to determine if it contains a valid
+     * service provider interface (SPI) record. If a descriptor contains an SPI record,
+     * it is accepted; otherwise, it is rejected with a corresponding list of problems.
+     * The results of the verification process are returned as a {@code PluginValidationResult}.
+     *
+     * @param descriptors a list of {@code SourcedDescriptor} objects to be validated
+     * @return a {@code PluginValidationResult} containing accepted descriptors and associated rejection details
+     */
+    static PluginValidationResult<SourcedDescriptor> verifyServiceProviderRecords(List<SourcedDescriptor> descriptors) {
+        // Scratch spaces to build the result
+        Set<SourcedDescriptor> accepted = new HashSet<>();
+        Map<SourcedDescriptor, List<LoaderProblem>> rejected = new HashMap<>();
+        
+        for (SourcedDescriptor descriptor : descriptors) {
+            try {
+                if (DescriptorScanner.hasServiceProviderInterfaceRecord(descriptor)) {
+                    accepted.add(descriptor);
+                } else {
+                    rejected.put(
+                        descriptor,
+                        List.of(new LoaderProblem.MissingServiceProviderRecord(
+                            descriptor.plugin().klass(),
+                            descriptor.plugin().kind(),
+                            descriptor.sourceLocation())
+                    ));
+                }
+            } catch (IOException | IllegalArgumentException e) {
+                rejected.put(descriptor, List.of(new LoaderProblem.LocationFailure(descriptor.sourceLocation(), e)));
+            }
+        }
+        
+        return new PluginValidationResult<>(
+            Set.copyOf(accepted),
+            PluginValidationResult.copyProblemMap(rejected),
+            Map.of()
         );
     }
     

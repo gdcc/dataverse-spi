@@ -5,7 +5,7 @@ import io.gdcc.spi.meta.descriptor.PluginDescriptor;
 import java.nio.file.Path;
 import java.util.Set;
 
-public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, LoaderProblem.LocationFailure, LoaderProblem.PluginClassApiLevelMismatch, LoaderProblem.PluginClassApiLevelMissing, LoaderProblem.PluginClassMismatch, LoaderProblem.PluginClassNameCollision, LoaderProblem.PluginClassNameCollisionWithCore, LoaderProblem.PluginClassUnsupported, LoaderProblem.SourceFailure {
+public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, LoaderProblem.LocationFailure, LoaderProblem.MissingServiceProviderRecord, LoaderProblem.PluginClassApiLevelMismatch, LoaderProblem.PluginClassApiLevelMissing, LoaderProblem.PluginClassMismatch, LoaderProblem.PluginClassNameCollision, LoaderProblem.PluginClassNameCollisionWithCore, LoaderProblem.PluginClassUnsupported, LoaderProblem.SourceFailure {
     
     String message();
     
@@ -37,6 +37,13 @@ public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, L
                         duplicate.identity(),
                         duplicate.sourceLocation()
             );
+        }
+    }
+    
+    record MissingServiceProviderRecord(String className, String kind, Path source) implements LoaderProblem {
+        @Override
+        public String message() {
+            return "Class " + className + " in " + source + " is missing entry in META-INF/services/" + kind;
         }
     }
     

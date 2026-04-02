@@ -2,18 +2,23 @@ package io.gdcc.spi.core.loader;
 
 import io.gdcc.spi.core.test.basic.TestContract;
 import io.gdcc.spi.meta.annotations.PluginContract;
-import io.gdcc.spi.meta.descriptor.DescriptorFormat;
 import io.gdcc.spi.meta.descriptor.SourcedDescriptor;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import io.gdcc.spi.meta.plugin.Plugin;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarOutputStream;
+import java.util.zip.ZipEntry;
 
-import static io.gdcc.spi.meta.descriptor.DescriptorFormat.*;
+import static io.gdcc.spi.meta.descriptor.DescriptorFormat.transformClassName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -247,6 +252,153 @@ class LoaderHelperTest {
             assertEquals(1, results.warning().size());
             assertTrue(results.warning().containsKey(nonMatching));
             assertEquals(0, results.rejected().size());
+        }
+    }
+    
+    @Nested
+    class VerifyServiceProviderRecords {
+        
+        @TempDir
+        Path tempDir;
+        
+        @Test
+        void verifyServiceProviderRecords_directorySourceWithMatchingRecordIsAccepted() throws Exception {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withSource(tempDir.toString())
+                .build();
+            
+            Path spiFile = createSpiFile(
+                tempDir,
+                descriptor.plugin().kind(),
+                descriptor.plugin().klass()
+            );
+            
+            // when
+            var results = LoaderHelper.verifyServiceProviderRecords(List.of(descriptor));
+            
+            // then
+            assertTrue(Files.isRegularFile(spiFile));
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(descriptor));
+            assertEquals(0, results.warning().size());
+            assertEquals(0, results.rejected().size());
+        }
+        
+        @Test
+        void verifyServiceProviderRecords_jarSourceWithMatchingRecordIsAccepted() throws Exception {
+            // given
+            Path jarPath = tempDir.resolve("plugin.jar");
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withSource(jarPath.toString())
+                .build();
+            
+            createJarWithSpiRecord(
+                jarPath,
+                descriptor.plugin().kind(),
+                descriptor.plugin().klass()
+            );
+            
+            // when
+            var results = LoaderHelper.verifyServiceProviderRecords(List.of(descriptor));
+            
+            // then
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(descriptor));
+            assertEquals(0, results.warning().size());
+            assertEquals(0, results.rejected().size());
+        }
+        
+        @Test
+        void verifyServiceProviderRecords_missingRecordIsRejected() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withSource(tempDir.toString())
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyServiceProviderRecords(List.of(descriptor));
+            
+            // then
+            assertEquals(0, results.accepted().size());
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            
+            List<LoaderProblem> problems = results.rejected().get(descriptor);
+            assertEquals(1, problems.size());
+            assertInstanceOf(LoaderProblem.MissingServiceProviderRecord.class, problems.get(0));
+        }
+        
+        @Test
+        void verifyServiceProviderRecords_missingSourceIsRejectedAsLocationFailure() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withSource(tempDir.resolve("missing-plugin.jar").toString())
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyServiceProviderRecords(List.of(descriptor));
+            
+            // then
+            assertEquals(0, results.accepted().size());
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            
+            List<LoaderProblem> problems = results.rejected().get(descriptor);
+            assertEquals(1, problems.size());
+            assertInstanceOf(LoaderProblem.LocationFailure.class, problems.get(0));
+        }
+        
+        @Test
+        void verifyServiceProviderRecords_recordWithWhitespaceAndCommentsIsAccepted() throws Exception {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withSource(tempDir.toString())
+                .build();
+            
+            createSpiFile(
+                tempDir,
+                descriptor.plugin().kind(),
+                """
+                # service registrations
+                   %s    # primary implementation
+
+                com.example.OtherImplementation
+                """.formatted(descriptor.plugin().klass())
+            );
+            
+            // when
+            var results = LoaderHelper.verifyServiceProviderRecords(List.of(descriptor));
+            
+            // then
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(descriptor));
+            assertEquals(0, results.warning().size());
+            assertEquals(0, results.rejected().size());
+        }
+        
+        private Path createSpiFile(Path root, String kind, String content) throws Exception {
+            Path serviceFile = root.resolve("META-INF").resolve("services").resolve(kind);
+            Files.createDirectories(serviceFile.getParent());
+            Files.writeString(serviceFile, content, StandardCharsets.UTF_8);
+            return serviceFile;
+        }
+        
+        private void createJarWithSpiRecord(Path jarPath, String kind, String content) throws Exception {
+            Path parent = jarPath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            
+            try (
+                OutputStream fileOut = Files.newOutputStream(jarPath);
+                JarOutputStream jarOut = new JarOutputStream(fileOut)
+            ) {
+                String entryName = "META-INF/services/" + kind;
+                jarOut.putNextEntry(new ZipEntry(entryName));
+                jarOut.write(content.getBytes(StandardCharsets.UTF_8));
+                jarOut.closeEntry();
+            }
         }
     }
     
