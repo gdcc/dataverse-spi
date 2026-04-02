@@ -208,7 +208,7 @@ final class LoaderHelper {
                     pluginClass.getCanonicalName()
                 ));
                 
-                if (configuration.ENFORCE_SINGLE_SOURCE_MATCHING_PLUGINS_ONLY())
+                if (configuration.enforceSingleSourceMatchingPluginsOnly())
                     rejected.put(descriptor, problems);
                 else {
                     warning.put(descriptor, problems);
@@ -548,7 +548,7 @@ final class LoaderHelper {
             }
         }
         
-        if (configuration.ENFORCE_UNAMBIGUOUS_PLUGIN_IDENTITIES()) {
+        if (configuration.enforceUnambiguousPluginIdentities()) {
             // Return duplicates as rejected
             return new PluginValidationResult<>(
                 Set.copyOf(accepted),

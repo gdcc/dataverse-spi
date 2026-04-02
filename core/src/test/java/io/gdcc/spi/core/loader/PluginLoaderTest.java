@@ -118,21 +118,9 @@ class PluginLoaderTest {
     @Nested
     class Preload {
         
-        LoaderConfiguration enforcingConfig = new LoaderConfiguration(
-            true,
-            false,
-            true,
-            true,
-            true
-        );
+        LoaderConfiguration enforcingConfig = LoaderConfiguration.defaults();
         
-        LoaderConfiguration permissiveConfig = new LoaderConfiguration(
-            false,
-            false,
-            false,
-            false,
-            false
-        );
+        LoaderConfiguration permissiveConfig = LoaderConfiguration.permissive();
         
         @Test
         void preLoad_throwsOnNormalProblemsWhenEnforcing() {

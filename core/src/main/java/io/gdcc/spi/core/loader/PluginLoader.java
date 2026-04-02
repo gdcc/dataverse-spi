@@ -59,7 +59,7 @@ public class PluginLoader<T extends Plugin> {
      * The parent ClassLoader is set to the current thread's context ClassLoader, which allows
      * plugins to access classes and resources on the core's classpath.
      * It uses the system default configuration for plugin loading behaviors,
-     * see {@link LoaderConfiguration#defaultConfiguration()}.
+     * see {@link LoaderConfiguration#defaults()}.
      *
      * @param pluginClass the Class object representing the plugin type {@code T} to load
      */
@@ -70,13 +70,13 @@ public class PluginLoader<T extends Plugin> {
     /**
      * Constructs a new PluginLoader that will load plugins of the specified type {@code T}.
      * It uses the system default configuration for plugin loading behaviors,
-     * see {@link LoaderConfiguration#defaultConfiguration()}.
+     * see {@link LoaderConfiguration#defaults()}.
      *
      * @param pluginClass the Class object representing the plugin type {@code T} to load
      * @param parentClassLoader the ClassLoader to be used as the parent for class loading of plugins
      */
     public PluginLoader(Class<T> pluginClass, ClassLoader parentClassLoader) {
-        this(pluginClass, LoaderConfiguration.defaultConfiguration(), parentClassLoader);
+        this(pluginClass, LoaderConfiguration.defaults(), parentClassLoader);
     }
     
     /**
@@ -275,7 +275,7 @@ public class PluginLoader<T extends Plugin> {
         
         // By default, we should abort now. In case we are asked to keep going by configuration,
         // let the logs show any found problems as warnings.
-        if (configuration.ABORT_ON_COMPATIBILITY_PROBLEMS() && (!sourceProblems.isEmpty() || !finalResults.rejected().isEmpty())) {
+        if (configuration.abortOnCompatibilityProblems() && (!sourceProblems.isEmpty() || !finalResults.rejected().isEmpty())) {
             throw new LoaderException(sourceProblems);
         }
         
@@ -364,7 +364,7 @@ public class PluginLoader<T extends Plugin> {
         
         // By default, we should abort now. In case we are asked to keep going by configuration,
         // let the logs show any found problems as warnings.
-        if (configuration.ABORT_ON_COMPATIBILITY_PROBLEMS() && (!sourceProblems.isEmpty() || !finalResults.rejected().isEmpty())) {
+        if (configuration.abortOnCompatibilityProblems() && (!sourceProblems.isEmpty() || !finalResults.rejected().isEmpty())) {
             throw new LoaderException(sourceProblems);
         }
         

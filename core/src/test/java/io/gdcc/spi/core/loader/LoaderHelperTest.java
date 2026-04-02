@@ -154,7 +154,7 @@ class LoaderHelperTest {
             var results = LoaderHelper.identifyNonImplementations(
                 descriptors,
                 TestContract.class,
-                enforcingConfiguration()
+                LoaderConfiguration.defaults()
             );
             
             // then
@@ -174,7 +174,7 @@ class LoaderHelperTest {
             var results = LoaderHelper.identifyNonImplementations(
                 List.of(descriptor),
                 TestContract.class,
-                enforcingConfiguration()
+                LoaderConfiguration.defaults()
             );
             
             // then
@@ -198,7 +198,7 @@ class LoaderHelperTest {
             var results = LoaderHelper.identifyNonImplementations(
                 List.of(descriptor),
                 TestContract.class,
-                permissiveConfiguration()
+                LoaderConfiguration.permissive()
             );
             
             // then
@@ -226,7 +226,7 @@ class LoaderHelperTest {
             var results = LoaderHelper.identifyNonImplementations(
                 List.of(matching, nonMatching),
                 TestContract.class,
-                enforcingConfiguration()
+                LoaderConfiguration.defaults()
             );
             
             // then
@@ -252,7 +252,7 @@ class LoaderHelperTest {
             var results = LoaderHelper.identifyNonImplementations(
                 List.of(matching, nonMatching),
                 TestContract.class,
-                permissiveConfiguration()
+                LoaderConfiguration.permissive()
             );
             
             // then
@@ -811,25 +811,5 @@ class LoaderHelperTest {
                 () -> LoaderHelper.toPluginDescriptor(sourceDescriptor, plugin, classLoader)
             );
         }
-    }
-    
-    static LoaderConfiguration enforcingConfiguration() {
-        return new LoaderConfiguration(
-            true,
-            false,
-            true,
-            true,
-            true
-        );
-    }
-    
-    static LoaderConfiguration permissiveConfiguration() {
-        return new LoaderConfiguration(
-            false,
-            false,
-            true,
-            true,
-            false
-        );
     }
 }
