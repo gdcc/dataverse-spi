@@ -1,6 +1,7 @@
 package io.gdcc.spi.core.loader;
 
 import io.gdcc.spi.core.test.basic.TestContract;
+import io.gdcc.spi.core.test.basic.TestProvider;
 import io.gdcc.spi.meta.annotations.PluginContract;
 import io.gdcc.spi.meta.descriptor.SourcedDescriptor;
 import io.gdcc.spi.meta.plugin.CoreProvider;
@@ -51,6 +52,14 @@ class LoaderHelperTest {
             assertThrows(
                 IllegalArgumentException.class,
                 () -> LoaderHelper.determineCoreApiLevel("foo.Bar", classLoader)
+            );
+        }
+        
+        @Test
+        void determineCoreApiLevel_providerClass() {
+            assertEquals(
+                TestProvider.API_LEVEL,
+                LoaderHelper.determineCoreApiLevel(transformClassName(TestProvider.class), classLoader)
             );
         }
     }

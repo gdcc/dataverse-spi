@@ -80,14 +80,14 @@ final class LoaderHelper {
     static int determineCoreApiLevel(Class<?> pluginClass) {
         // Looking up the plugin contract API level is only ever valid on SPI interfaces but never on implementations.
         if (!pluginClass.isInterface()) {
-            throw new IllegalArgumentException("Plugin class must be an interface");
+            throw new IllegalArgumentException("Class must be an interface");
         }
         try {
             // Retrieve the field from exactly this class (we don't want to search any superclasses here!)
             Field apiLevel = pluginClass.getDeclaredField(ProcessorConstants.API_LEVEL_FIELD_NAME);
             return apiLevel.getInt(pluginClass);
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IllegalStateException("Plugin contract class must have an (accessible) " + ProcessorConstants.API_LEVEL_FIELD_NAME + " field");
+            throw new IllegalStateException("Contract class must have an (accessible) " + ProcessorConstants.API_LEVEL_FIELD_NAME + " field");
         }
     }
     
@@ -116,7 +116,7 @@ final class LoaderHelper {
         try {
             return Class.forName(className, false, classLoader);
         } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException("Plugin class not found: " + className, e);
+            throw new IllegalArgumentException("Class " + className + " could not be found in core", e);
         }
     }
     
