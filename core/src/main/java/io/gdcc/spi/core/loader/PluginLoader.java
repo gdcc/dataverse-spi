@@ -256,17 +256,19 @@ public class PluginLoader<T extends Plugin> {
         
         // 5. Verify that the API level of the plugin matches the core-expected level(s).
         var apiLevelResult = LoaderHelper.verifyPluginApiLevels(descriptors, this.pluginClass, this.parentClassLoader);
-        logger.debug("Scanning for API level matches results: {}", apiLevelResult);
+        logger.debug("Scanning for plugin API level matches results: {}", apiLevelResult);
         
         // 6. Verify all the provider requirements by the plugin are met
-        // TODO: implement
+        var providerLevelsResult = LoaderHelper.verifyProviderApiLevels(descriptors, this.parentClassLoader);
+        logger.debug("Scanning for provider API level matches results: {}", apiLevelResult);
         
         // Merge all the different results to receive the final picture which plugins are faulty
         var finalResults = PluginValidationResult.merge(
             collisionResult,
             implementationResult,
             serviceProviderResult,
-            apiLevelResult
+            apiLevelResult,
+            providerLevelsResult
         );
         // Merge all the problems into one large list, to be wrapped in an exception
         finalResults.rejected().forEach((descriptor, problems) -> sourceProblems.addAll(problems));

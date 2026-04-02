@@ -512,6 +512,133 @@ class LoaderHelperTest {
     }
     
     @Nested
+    class VerifyProviderApiLevels {
+        
+        @Test
+        void verifyProviderApiLevels_happyPath() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withRequiredProviders(Map.of(transformClassName(TestProvider.class), TestProvider.API_LEVEL))
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(descriptor), classLoader);
+            
+            // then
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(descriptor));
+            assertEquals(0, results.warning().size());
+            assertEquals(0, results.rejected().size());
+        }
+        
+        @Test
+        void verifyProviderApiLevels_providerLevelMismatch() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withRequiredProviders(Map.of(transformClassName(TestProvider.class), TestProvider.API_LEVEL + 1))
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(descriptor), classLoader);
+            
+            // then
+            assertEquals(0, results.accepted().size());
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            assertTrue(results.rejected().containsKey(descriptor));
+            assertInstanceOf(LoaderProblem.ProviderApiLevelMismatch.class, results.rejected().get(descriptor).get(0));
+        }
+        
+        @Test
+        void verifyProviderApiLevels_unsupportedProvider() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withRequiredProviders(Map.of("com.example.MissingProvider", 7))
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(descriptor), classLoader);
+            
+            // then
+            assertEquals(0, results.accepted().size());
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            assertTrue(results.rejected().containsKey(descriptor));
+            assertInstanceOf(LoaderProblem.ProviderClassUnsupported.class, results.rejected().get(descriptor).get(0));
+        }
+        
+        @Test
+        void verifyProviderApiLevels_reportsMultipleProblemsForSingleDescriptor() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withRequiredProviders(Map.of(
+                    transformClassName(TestProvider.class), TestProvider.API_LEVEL + 1,
+                    "com.example.MissingProvider", 7
+                ))
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(descriptor), classLoader);
+            
+            // then
+            assertEquals(0, results.accepted().size());
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            assertTrue(results.rejected().containsKey(descriptor));
+            
+            List<LoaderProblem> problems = results.rejected().get(descriptor);
+            assertEquals(2, problems.size());
+            assertTrue(problems.stream().anyMatch(
+                problem -> problem.getClass().equals(LoaderProblem.ProviderApiLevelMismatch.class)
+            ));
+            assertTrue(problems.stream().anyMatch(
+                problem -> problem.getClass().equals(LoaderProblem.ProviderClassUnsupported.class)
+            ));
+        }
+        
+        @Test
+        void verifyProviderApiLevels_descriptorWithoutRequiredProvidersIsAccepted() {
+            // given
+            SourcedDescriptor descriptor = DescriptorBuilder.aDescriptor()
+                .withRequiredProviders(Map.of())
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(descriptor), classLoader);
+            
+            // then
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(descriptor));
+            assertEquals(0, results.warning().size());
+            assertEquals(0, results.rejected().size());
+        }
+        
+        @Test
+        void verifyProviderApiLevels_mixedDescriptorsSeparatesAcceptedAndRejected() {
+            // given
+            SourcedDescriptor matching = DescriptorBuilder.aDescriptor()
+                .withSource("matching.jar")
+                .withRequiredProviders(Map.of(transformClassName(TestProvider.class), TestProvider.API_LEVEL))
+                .build();
+            
+            SourcedDescriptor mismatching = DescriptorBuilder.aDescriptor()
+                .withSource("mismatching.jar")
+                .withRequiredProviders(Map.of(transformClassName(TestProvider.class), TestProvider.API_LEVEL + 1))
+                .build();
+            
+            // when
+            var results = LoaderHelper.verifyProviderApiLevels(List.of(matching, mismatching), classLoader);
+            
+            // then
+            assertEquals(1, results.accepted().size());
+            assertTrue(results.accepted().contains(matching));
+            assertEquals(0, results.warning().size());
+            assertEquals(1, results.rejected().size());
+            assertTrue(results.rejected().containsKey(mismatching));
+        }
+    }
+    
+    @Nested
     class ToPluginDescriptor {
         
         interface TestProvider extends CoreProvider {

@@ -5,7 +5,7 @@ import io.gdcc.spi.meta.descriptor.PluginDescriptor;
 import java.nio.file.Path;
 import java.util.Set;
 
-public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, LoaderProblem.LocationFailure, LoaderProblem.MissingServiceProviderRecord, LoaderProblem.PluginClassApiLevelMismatch, LoaderProblem.PluginClassApiLevelMissing, LoaderProblem.PluginClassMismatch, LoaderProblem.PluginClassNameCollision, LoaderProblem.PluginClassNameCollisionWithCore, LoaderProblem.PluginClassUnsupported, LoaderProblem.SourceFailure {
+public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, LoaderProblem.LocationFailure, LoaderProblem.MissingServiceProviderRecord, LoaderProblem.PluginClassApiLevelMismatch, LoaderProblem.PluginClassApiLevelMissing, LoaderProblem.PluginClassMismatch, LoaderProblem.PluginClassNameCollision, LoaderProblem.PluginClassNameCollisionWithCore, LoaderProblem.PluginClassUnsupported, LoaderProblem.ProviderApiLevelMismatch, LoaderProblem.ProviderClassUnsupported, LoaderProblem.SourceFailure {
     
     String message();
     
@@ -86,6 +86,20 @@ public sealed interface LoaderProblem permits LoaderProblem.DuplicateIdentity, L
         @Override
         public String message() {
             return "Class " + classname + " in " + source + " uses API level " + pluginLevel + " but core expects " + coreLevel;
+        }
+    }
+    
+    record ProviderApiLevelMismatch(String classname, Path source, String provider, int coreLevel, int pluginLevel) implements LoaderProblem {
+        @Override
+        public String message() {
+            return "Class " + classname + " in " + source + " requires API level " + pluginLevel + " for provider " + provider + ", but core provides " + coreLevel;
+        }
+    }
+    
+    record ProviderClassUnsupported(String className, Path source, String provider) implements LoaderProblem {
+        @Override
+        public String message() {
+            return "Class " + className + " in " + source + " requires unsupported provider " + provider;
         }
     }
 }

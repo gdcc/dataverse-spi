@@ -360,6 +360,84 @@ final class LoaderHelper {
     }
     
     /**
+     * Verifies the API levels of required providers declared by plugins against the available API levels in the core system.
+     * This method validates all plugins in the provided list and determines whether they are compatible with the
+     * API levels exposed by the core system. It returns a validation result containing accepted plugins and details
+     * of rejected plugins with their associated problems.
+     *
+     * @param descriptors the list of plugin descriptors to validate. Each descriptor contains information about
+     *                    the plugin and its source location.
+     * @param classLoader the class loader used to resolve provider classes and determine their API levels.
+     * @return a {@code PluginValidationResult<SourcedDescriptor>} instance. The result contains the sets of
+     *         accepted and rejected plugins, with detailed reasons for rejection.
+     */
+    static PluginValidationResult<SourcedDescriptor> verifyProviderApiLevels(List<SourcedDescriptor> descriptors, ClassLoader classLoader) {
+        // Scratch spaces to build the result
+        Set<SourcedDescriptor> accepted = new HashSet<>();
+        Map<SourcedDescriptor, List<LoaderProblem>> rejected = new HashMap<>();
+        
+        // Save a few CPU cycles by not using the classloader over and over again for the same provider class
+        Map<String, Integer> lookedUpProviders = new HashMap<>();
+        
+        // Check all the plugins
+        for (SourcedDescriptor descriptor : descriptors) {
+            // Note: the way how we create the descriptors rules out we see any null keys or values in this map.
+            Map<String,Integer> requiredProviders = descriptor.plugin().requiredProviders();
+            // Save all the problems identified during validation
+            List<LoaderProblem> problems = new ArrayList<>();
+            
+            // Iterate over all the providers required by the plugin
+            for (String provider : requiredProviders.keySet()) {
+                int pluginLevel = requiredProviders.get(provider);
+                
+                // Look up the API level for required provider within the core
+                int coreLevel;
+                try {
+                    if (lookedUpProviders.containsKey(provider)) {
+                        coreLevel = lookedUpProviders.get(provider);
+                    } else {
+                        coreLevel = determineCoreApiLevel(provider, classLoader);
+                        lookedUpProviders.put(provider, coreLevel);
+                    }
+                // In case the core does not support the provider (contract not even found), the plugin must be rejected.
+                } catch (IllegalArgumentException e) {
+                    problems.add(new LoaderProblem.ProviderClassUnsupported(
+                        descriptor.plugin().klass(),
+                        descriptor.sourceLocation(),
+                        provider
+                    ));
+                    // Skip the rest and continue with the next provider
+                    continue;
+                }
+                
+                // Now match the API level against the plugin's requirements
+                if (coreLevel != pluginLevel) {
+                    problems.add(new LoaderProblem.ProviderApiLevelMismatch(
+                        descriptor.plugin().klass(),
+                        descriptor.sourceLocation(),
+                        provider,
+                        coreLevel,
+                        pluginLevel
+                    ));
+                }
+            }
+            
+            if (problems.isEmpty()) {
+                accepted.add(descriptor);
+            } else {
+                rejected.put(descriptor, List.copyOf(problems));
+            }
+        }
+        
+        return new PluginValidationResult<>(
+            Set.copyOf(accepted),
+            PluginValidationResult.copyProblemMap(rejected),
+            Map.of()
+        );
+    }
+    
+    
+    /**
      * Converts a {@link SourcedDescriptor} and a plugin instance into a {@link PluginDescriptor}.
      *
      * @param <T> The type of the plugin, constrained to extend {@link Plugin}.
