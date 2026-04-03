@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.gdcc.spi</groupId>
+        <artifactId>parent</artifactId>
+        <version>2.1.0-SNAPSHOT</version>
+    </parent>
+    
+    <artifactId>export</artifactId>
+    <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
+    <!-- <version>x.y.z.-SNAPSHOT</version> -->
+    
+    <dependencies>
+        <!-- INTERNAL FOUNDATION DEPENDENCIES -->
+        <dependency>
+            <groupId>io.gdcc.spi</groupId>
+            <artifactId>meta</artifactId>
+        </dependency>
+        
+        <!-- FUNCTIONAL DEPENDENCIES -->
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+            <scope>provided</scope>
+            <!-- no version here as managed by parent -->
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <scope>provided</scope>
+            <!-- no version here as managed by parent -->
+        </dependency>
+    </dependencies>
+</project>

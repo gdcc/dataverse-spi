@@ -1,0 +1,48 @@
+name: Publish Maven Site
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-maven-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-site:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # TODO: Later on, we need to extend this mechanism to provide both version and snapshot,
+      #       as well as a different case the stable version and "latest".
+      - name: Build and verify project site
+        # By default, docs.site.base is / for local development. For deployment, this needs to be adapted.
+        # IMPORTANT: make sure the base ends with "/"!
+        run: mvn -B verify site -Ddocs.site.base=/dataverse-spi/snapshot/
+
+      - name: Add .nojekyll
+        run: touch target/site/.nojekyll
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: target/site
+          target-folder: snapshot
+          clean: true
+          single-commit: true

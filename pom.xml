@@ -10,13 +10,20 @@
         <version>0.13.1</version>
     </parent>
     
-    <groupId>io.gdcc</groupId>
-    <artifactId>dataverse-spi</artifactId>
+    <groupId>io.gdcc.spi</groupId>
+    <artifactId>parent</artifactId>
+    <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
     <version>2.1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
     
     <name>Dataverse SPI Plugin API</name>
     <url>https://dataverse.org</url>
+    <modules>
+        <module>api</module>
+        <module>core</module>
+        <module>export</module>
+        <module>meta</module>
+    </modules>
     <description>
         A package to create out-of-tree Java code for Dataverse Software. Plugin projects can use this package
         as an API dependency just like Jakarta EE APIs if they want to create external plugins. These will be loaded
@@ -31,19 +38,152 @@
         </developer>
     </developers>
     
+    <licenses>
+        <license>
+            <name>${project.license.name}</name>
+            <url>${project.license.url}</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    
+    <scm>
+        <url>https://github.com/gdcc/dataverse-spi</url>
+    </scm>
+    
+    <properties>
+        <jdk.version>17</jdk.version>
+        <project.license.name>Apache License, Version 2.0</project.license.name>
+        <project.license.url>https://www.apache.org/licenses/LICENSE-2.0.txt</project.license.url>
+        <docs.site.base>/</docs.site.base>
+    </properties>
+    
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.gdcc.spi</groupId>
+                <artifactId>meta</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.gdcc.spi</groupId>
+                <artifactId>core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.gdcc.spi</groupId>
+                <artifactId>export</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    
     <dependencies>
+        <!-- TESTING -->
         <dependency>
-            <groupId>jakarta.json</groupId>
-            <artifactId>jakarta.json-api</artifactId>
-            <scope>provided</scope>
-            <!-- no version here as managed by parent -->
-        </dependency>
-        <dependency>
-            <groupId>jakarta.ws.rs</groupId>
-            <artifactId>jakarta.ws.rs-api</artifactId>
-            <scope>provided</scope>
-            <!-- no version here as managed by parent -->
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.sentrysoftware.maven</groupId>
+                        <artifactId>maven-skin-tools</artifactId>
+                        <version>1.7.00</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <reportSets>
+                    <reportSet>
+                        <id>aggregate-javadocs</id>
+                        <!-- inherited=false means children do not do the same thing individually -->
+                        <inherited>false</inherited>
+                        <reports>
+                            <report>aggregate</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+                <configuration>
+                    <show>protected</show>
+                    <!-- Remove after Javadocs -->
+                    <doclint>none</doclint>
+                    
+                    <detectLinks>true</detectLinks>
+                    <failOnError>false</failOnError>
+                    <quiet>true</quiet>
+                    <source>${jdk.version}</source>
+                    
+                    <doctitle>Dataverse SPI Plugin API Reference</doctitle>
+                    <windowtitle>Dataverse SPI Plugin API Reference</windowtitle>
+                    <addStylesheets>
+                        <addStylesheet>custom.css</addStylesheet>
+                    </addStylesheets>
+                    <!-- Create a banner on top of every page allowing to return to main docs page   -->
+                    <top><![CDATA[
+                        <div class="top-nav-backlink">
+                            <a href="${docs.site.base}index.html">← Back to Dataverse SPI Plugin API homepage</a>
+                        </div>
+                    ]]></top>
+                    <bottom><![CDATA[
+                        <div>
+                            Version ${project.version} -&nbsp;
+                            Copyright by ${project.organization.name} -&nbsp;
+                            Licensed under <a href="${project.license.url}" target="_blank">${project.license.name}</a> |&nbsp;
+                            <a href="${docs.site.base}index.html">Dataverse SPI Plugin API</a> |&nbsp;
+                            <a href="https://dataverse.org" target="_blank">The Dataverse Project</a>
+                        </div>
+                    ]]></bottom>
+                    
+                    <tags>
+                        <tag>
+                            <name>apiNote</name>
+                            <placement>a</placement>
+                            <head>API Note:</head>
+                        </tag>
+                        <tag>
+                            <name>implSpec</name>
+                            <placement>a</placement>
+                            <head>Implementation Requirements:</head>
+                        </tag>
+                        <tag>
+                            <name>implNote</name>
+                            <placement>a</placement>
+                            <head>Implementation Note:</head>
+                        </tag>
+                    </tags>
+                </configuration>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>3.9.0</version>
+                <reportSets>
+                    <reportSet>
+                        <id>root-project-info</id>
+                        <!-- inherited=false means children do not do the same thing individually -->
+                        <inherited>false</inherited>
+                        <reports>
+                            <report>team</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+        </plugins>
+    </reporting>
     
 </project>
