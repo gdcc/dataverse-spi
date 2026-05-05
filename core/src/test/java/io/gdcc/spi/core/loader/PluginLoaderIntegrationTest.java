@@ -52,7 +52,7 @@ class PluginLoaderIntegrationTest {
     final String simplePluginClassFile = pluginPackage.replace(".", "/") + "/" + simplePluginClass +  ".java";
     final String simplePluginCode = pluginCodeTemplate.formatted(pluginPackage, contractPackage, contractClass, simplePluginClass, contractClass);
     
-    @ParameterizedTest
+    @ParameterizedTest(name = "API levels: core={0}, plugin={1}")
     @CsvSource({"1,2","2,1"})
     void rejectsPluginCompiledAgainstDifferentBaseApiLevel(int coreLevel, int pluginLevel) throws Exception {
         // Given
