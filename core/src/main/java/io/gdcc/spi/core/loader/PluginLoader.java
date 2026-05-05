@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.regex.PatternSyntaxException;
@@ -251,8 +250,11 @@ public class PluginLoader<T extends Plugin> {
         logger.debug("Scanning for non-implementations results: {}", implementationResult);
         
         // 4. Verify that every plugin class has a service loader entry. Remove any affected from the list.
-        var serviceProviderResult = LoaderHelper.verifyServiceProviderRecords(descriptors);
-        logger.debug("Scanning for SPI record results: {}", serviceProviderResult);
+        // 2026-05-05 OB: To avoid class loading conflicts by the Java SPI default ServiceLoader,
+        //                we now use our own, custom loader to initialize plugins.
+        //                This check is no longer necessary but kept if we need to re-introduce it.
+        //var serviceProviderResult = LoaderHelper.verifyServiceProviderRecords(descriptors);
+        //logger.debug("Scanning for SPI record results: {}", serviceProviderResult);
         
         // 5. Verify that the API level of the plugin matches the core-expected level(s).
         var apiLevelResult = LoaderHelper.verifyPluginApiLevels(descriptors, this.pluginClass, this.parentClassLoader);
@@ -266,7 +268,7 @@ public class PluginLoader<T extends Plugin> {
         var finalResults = PluginValidationResult.merge(
             collisionResult,
             implementationResult,
-            serviceProviderResult,
+            //serviceProviderResult,
             apiLevelResult,
             providerLevelsResult
         );
@@ -319,37 +321,46 @@ public class PluginLoader<T extends Plugin> {
         List<LoaderProblem> sourceProblems = new ArrayList<>();
         List<PluginHandle<T>> loadedPlugins = new ArrayList<>();
         
-        // Create URLClassLoader for each file and load the plugin
-        descriptors.forEach(descriptor -> {
+        // Create URLClassLoader for each file and load the plugin from the location
+        for (SourcedDescriptor descriptor : descriptors) {
             URL[] sourceUrl = sources.get(descriptor.sourceLocation());
-            try (URLClassLoader classLoader = URLClassLoader.newInstance(sourceUrl, this.parentClassLoader)) {
-                // Load all plugins that can be found within the source for type T
-                ServiceLoader<T> loader = ServiceLoader.load(this.pluginClass, classLoader);
+            String pluginClassName = descriptor.plugin().klass();
+            
+            try {
+                // Load the plugin from the source
+                T plugin = LoaderHelper.loadPluginClass(
+                    pluginClassName,
+                    this.pluginClass,
+                    sourceUrl,
+                    this.parentClassLoader
+                );
                 
-                // Iterate over all found plugins and add to the plugin map, including source information
-                loader.forEach(plugin -> {
-                    String identity = plugin.identity();
-                    if (identity == null || identity.isBlank()) {
-                        sourceProblems.add(new LoaderProblem.LocationFailure(
-                            descriptor.sourceLocation(),
-                            new IllegalArgumentException(plugin.getClass().getCanonicalName() + "'s identity cannot be null or blank")));
-                        return;
-                    }
-                    
-                    // Save the plugin and its metadata to the set of already loaded plugins
-                    loadedPlugins.add(
-                        new PluginHandle<>(
-                            LoaderHelper.toPluginDescriptor(
-                                descriptor,
-                                plugin,
-                                this.parentClassLoader),
-                            plugin)
-                    );
-                });
-            } catch (IOException | NoSuchMethodError | ServiceConfigurationError | UnsupportedClassVersionError e) {
+                // Check for a valid identity being present, making the plugin identifiable once handed over to core
+                String identity = plugin.identity();
+                if (identity == null || identity.isBlank()) {
+                    sourceProblems.add(new LoaderProblem.LocationFailure(
+                        descriptor.sourceLocation(),
+                        new IllegalArgumentException(pluginClassName + "'s identity cannot be null or blank")));
+                    continue;
+                }
+                
+                // Save the plugin and its metadata to the set of already loaded plugins
+                loadedPlugins.add(
+                    new PluginHandle<>(
+                        LoaderHelper.toPluginDescriptor(
+                            descriptor,
+                            plugin,
+                            this.parentClassLoader),
+                        plugin)
+                );
+            } catch (IllegalArgumentException e) {
+                sourceProblems.add(new LoaderProblem.PluginClassMismatch(pluginClassName, descriptor.sourceLocation(), pluginClass.getName()));
+            } catch (IllegalStateException e) {
+                sourceProblems.add(new LoaderProblem.PluginClassNameCollisionWithCore(pluginClassName, descriptor.sourceLocation()));
+            } catch ( ReflectiveOperationException | IOException e) {
                 sourceProblems.add(new LoaderProblem.LocationFailure(descriptor.sourceLocation(), e));
             }
-        });
+        }
         logger.debug("Loader was able to load {} plugins from {} sources.", loadedPlugins.size(), sources.size());
         
         // Make sure there are no duplicate plugin identities

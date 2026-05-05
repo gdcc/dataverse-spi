@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -434,6 +435,52 @@ final class LoaderHelper {
             PluginValidationResult.copyProblemMap(rejected),
             Map.of()
         );
+    }
+    
+    /**
+     * Loads and instantiates a plugin class from the specified URL using the provided class loader and verifies
+     * that it implements the expected plugin interface or superclass.
+     *
+     * @param <T>         The type of the plugin, which extends the {@code Plugin} interface or class.
+     * @param className   The fully qualified name of the class to load.
+     * @param pluginClass The expected class or interface that the plugin must extend or implement.
+     * @param url         The URL pointing to the plugin's location (e.g., a jar file).
+     * @param parent      The parent {@code ClassLoader} to use as a fallback during class loading.
+     * @return An instance of the loaded plugin class, cast to the specified plugin type.
+     * @throws ReflectiveOperationException If the class cannot be loaded, instantiated, or lacks a no-argument constructor.
+     * @throws IOException If an I/O error occurs while accessing the plugin's location.
+     * @throws IllegalStateException If the plugin class is resolved from the parent class loader instead of the provided URL.
+     * @throws IllegalArgumentException If the loaded class does not implement or extend the specified plugin type.
+     */
+    static <T extends Plugin> T loadPluginClass(
+        String className,
+        Class<T> pluginClass,
+        URL[] url,
+        ClassLoader parent
+    ) throws ReflectiveOperationException, IOException {
+        try (URLClassLoader loader = URLClassLoader.newInstance(url, parent)) {
+            // Load the class and initialize it right away.
+            // IMPORTANT: If the same FQCN is on the parent class loader path, the class would be retrieved from there, not the URL!
+            //            As part of preload(), LoaderHelper.verifyNoClassCollisions() already made sure no collision exists.
+            Class<?> rawClass = Class.forName(className, false, loader);
+            
+            // Just to be really sure, verify this is from the plugin, not the core
+            if (rawClass.getClassLoader() != loader) {
+                throw new IllegalStateException(
+                    "Plugin class " + className + " resolved from parent instead of plugin source"
+                );
+            }
+            
+            // Make sure the class is actually an implementation of the expected class
+            // (and the plugin descriptor didn't lie about it in preload checks)
+            if (!pluginClass.isAssignableFrom(rawClass)) {
+                throw new IllegalArgumentException("Plugin does not implement contract class");
+            }
+            
+            // Try to get an actual instance of the class with the default noargs constructor
+            Class<? extends T> implClass = rawClass.asSubclass(pluginClass);
+            return implClass.getDeclaredConstructor().newInstance();
+        }
     }
     
     
