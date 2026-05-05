@@ -3103,7 +3103,7 @@ class PluginContractProcessorTest {
             ));
             
             assertFalse(result.success(), "Compilation should fail");
-            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "PluginContract is not a repeatable annotation type");
+            assertDiagnosticContains(result, Diagnostic.Kind.ERROR, "PluginContract is not a repeatable annotation");
         }
     }
     

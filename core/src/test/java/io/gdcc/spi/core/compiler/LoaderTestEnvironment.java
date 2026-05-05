@@ -61,9 +61,11 @@ public final class LoaderTestEnvironment {
 
     public static final class Builder {
         private final List<TestJavaCompiler.SourceFile> coreSources = new ArrayList<>();
+        private final List<Processor> coreProcessors = new ArrayList<>();
         private final List<TestJavaCompiler.SourceFile> pluginSources = new ArrayList<>();
         private final List<Processor> pluginProcessors = new ArrayList<>();
 
+        // TODO: inject this via system property, set by surefire configuration
         private String release = "17";
         private boolean packagePluginAsJar = false;
         private String pluginJarName = "plugin-under-test.jar";
@@ -78,6 +80,11 @@ public final class LoaderTestEnvironment {
 
         public Builder addCoreSource(String relativePath, String content) {
             this.coreSources.add(TestJavaCompiler.SourceFile.of(relativePath, content));
+            return this;
+        }
+        
+        public Builder addCoreProcessor(Processor processor) {
+            this.coreProcessors.add(processor);
             return this;
         }
 
@@ -104,30 +111,26 @@ public final class LoaderTestEnvironment {
         public LoaderTestEnvironment build() throws IOException {
             TestCompilation coreCompilation = TestJavaCompiler.builder()
                 .withRelease(release)
+                .withProcessors(coreProcessors)
                 .build()
                 .compile(coreSources);
-
+            
             coreCompilation.assertSuccess();
 
-            URLClassLoader coreClassLoader =
-                coreCompilation.newClassLoader(Thread.currentThread().getContextClassLoader());
-
-            TestJavaCompiler.Builder pluginCompilerBuilder = TestJavaCompiler.builder()
+            URLClassLoader coreClassLoader = coreCompilation.newClassLoader(Thread.currentThread().getContextClassLoader());
+            
+            TestCompilation pluginCompilation = TestJavaCompiler.builder()
                 .withRelease(release)
-                .withClasspathEntry(coreCompilation.classOutputDir());
-
-            if (!pluginProcessors.isEmpty()) {
-                pluginCompilerBuilder.withProcessors(pluginProcessors);
-            }
-
-            TestCompilation pluginCompilation = pluginCompilerBuilder
+                .withClasspathEntry(coreCompilation.classOutputDir())
+                .withProcessors(pluginProcessors)
                 .build()
                 .compile(pluginSources);
-
+            
             pluginCompilation.assertSuccess();
 
             Path pluginArtifact = packagePluginAsJar
-                ? pluginCompilation.createJar(pluginJarName)
+                  // Use the parent = containing dir here, as the loader always scans full directories
+                ? pluginCompilation.createJar(pluginJarName).getParent()
                 : pluginCompilation.classOutputDir();
 
             return new LoaderTestEnvironment(

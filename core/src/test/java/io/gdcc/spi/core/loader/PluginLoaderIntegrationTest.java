@@ -6,12 +6,15 @@ import io.gdcc.spi.meta.processor.PluginContractProcessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class PluginLoaderIntegrationTest {
     
@@ -52,7 +55,7 @@ class PluginLoaderIntegrationTest {
     final String simplePluginClassFile = pluginPackage.replace(".", "/") + "/" + simplePluginClass +  ".java";
     final String simplePluginCode = pluginCodeTemplate.formatted(pluginPackage, contractPackage, contractClass, simplePluginClass, contractClass);
     
-    @ParameterizedTest
+    @ParameterizedTest(name = "API levels: core={0}, plugin={1}")
     @CsvSource({"1,2","2,1"})
     void rejectsPluginCompiledAgainstDifferentBaseApiLevel(int coreLevel, int pluginLevel) throws Exception {
         // Given
@@ -86,8 +89,9 @@ class PluginLoaderIntegrationTest {
         assertInstanceOf(LoaderProblem.PluginClassApiLevelMismatch.class, ex.getProblems().get(0));
     }
     
-    @Test
-    void acceptsPluginCompiledAgainstSameBaseApiLevel() throws Exception {
+    @ParameterizedTest(name = "Packaging as JAR: {0}")
+    @ValueSource(booleans = {true, false})
+    void acceptsPluginCompiledAgainstSameBaseApiLevel(boolean packageAsJar) throws Exception {
         // Given
         int apiLevel = 5;
         
@@ -105,7 +109,7 @@ class PluginLoaderIntegrationTest {
                 simplePluginCode
             )
             .addPluginProcessor(new PluginContractProcessor())
-            .packagePluginAsJar(false)
+            .packagePluginAsJar(packageAsJar)
             .build();
         
         Class<?> pluginContractClass = env.coreClassLoader().loadClass(contractPackage + "." + contractClass);
@@ -115,11 +119,15 @@ class PluginLoaderIntegrationTest {
         PluginLoader<?> loader = new PluginLoader<>(typedContract, env.coreClassLoader());
         Path pluginLocation = Path.of(env.pluginArtifact().toString());
         
-        // When
-        var plugins = loader.load(pluginLocation);
-        
-        // Then
-        assertEquals(1, plugins.size());
-        assertEquals(pluginPackage + "." + simplePluginClass, plugins.get(0).plugin().getClass().getName());
+        try {
+            // When
+            var plugins = loader.load(pluginLocation);
+            
+            // Then
+            assertEquals(1, plugins.size());
+            assertEquals(pluginPackage + "." + simplePluginClass, plugins.get(0).plugin().getClass().getName());
+        } catch (LoaderException e) {
+            fail("Loader problems detected:\n" + e.getProblems().stream().map(LoaderProblem::message).collect(Collectors.joining(",\n")), e);
+        }
     }
 }
