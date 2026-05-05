@@ -129,6 +129,7 @@ public class PluginLoader<T extends Plugin> {
      * <p>Loads all plugins of type {@code T} from JAR files located in the specified directory.
      * Each JAR file is loaded using a dedicated {@link URLClassLoader}, and plugins are
      * discovered via the Java {@link ServiceLoader} mechanism (META-INF/services/package.plus.service.ClassName file).
+     * </p>
      *
      * <p>For each discovered plugin, its {@link Plugin#identity()} must be non-null and non-blank;
      * otherwise, it is skipped and an error is recorded.
@@ -139,6 +140,11 @@ public class PluginLoader<T extends Plugin> {
      * @throws LoaderException if one or more errors occur during loading, if no plugins
      *         could be successfully loaded, or if there are any duplicates.
      *         Note: The exception may contain multiple causes, each associated with a specific file or failure point
+     * @apiNote The loader <i>will not</i> verify that any loaded plugin identities do not collide with identities loaded
+     *          by other loaders from different locations or classpaths. It is up to the calling code to take care of this
+     *          verification, allowing for flexibility how to deal with these potential collisions between plugins in external
+     *          locations and/or ones shipped with the core. The members of this list of plugins returned by this function are
+     *          guaranteed to be unique by identity and class name only among themselves.
      */
     public List<PluginHandle<T>> load(Path pluginJarsLocation) {
         
@@ -309,7 +315,8 @@ public class PluginLoader<T extends Plugin> {
      * The returned map's keys describe the source of each loaded plugin via {@link PluginDescriptor},
      * associating the plugin's logical identity, class name, and JAR file location. It is the
      * caller's responsibility to verify no duplicates (by class name or identity) exist before
-     * handing the plugins to the core.
+     * handing the plugins to the core. The members of this list of plugins returned by this function are
+     * guaranteed to be unique by identity and class name only among themselves.
      *
      * @param sources a mapping from (JAR) file paths to their corresponding URLs used for class loading
      * @return a map from {@link PluginDescriptor} metadata to the corresponding plugin instance
