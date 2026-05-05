@@ -129,7 +129,8 @@ public final class LoaderTestEnvironment {
             pluginCompilation.assertSuccess();
 
             Path pluginArtifact = packagePluginAsJar
-                ? pluginCompilation.createJar(pluginJarName)
+                  // Use the parent = containing dir here, as the loader always scans full directories
+                ? pluginCompilation.createJar(pluginJarName).getParent()
                 : pluginCompilation.classOutputDir();
 
             return new LoaderTestEnvironment(
