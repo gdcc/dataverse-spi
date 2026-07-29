@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static io.gdcc.spi.export.FileMetadataPredicates.*;
 
@@ -21,8 +22,9 @@ import static io.gdcc.spi.export.FileMetadataPredicates.*;
  * or composed inside a {@code DatasetExportQuery} to specify how file metadata
  * should be shaped within a dataset export.
  * <p>
- * Instances are immutable and must be constructed via {@link #builder()}.
- * Use {@link #defaults()} for the standard all-files query with no special filtering.
+ * Instances are immutable and must be constructed via {@link #builder()} or cloned using {@link #builder(FileExportQuery)}.
+ * Use {@link #all()} for the standard "all files" query with no special filtering.
+ * Use {@link #none()} for the standard "no files" query.
  *
  * @see FileMetadataPredicates
  */
@@ -31,9 +33,13 @@ public final class FileExportQuery {
     private final Set<FileMetadataPredicates> filePredicates;
     
     /**
-     * Default query with no special options.
+     * Query: "include all files without filtering any nor including special details"
      */
-    private static final FileExportQuery DEFAULT = builder().addFilePredicate(ALL_FILES).build();
+    private static final FileExportQuery ALL = builder().addFilePredicate(ALL_FILES).build();
+    /**
+     * Query: "skip all files"
+     */
+    private static final FileExportQuery NONE = builder().addFilePredicate(SKIP_FILES).build();
     
     private FileExportQuery(Builder builder) {
         this.filePredicates = builder.filePredicates;
@@ -47,10 +53,29 @@ public final class FileExportQuery {
     }
     
     /**
-     * Returns a default query, which includes all files without filtering or detail restrictions.
+     * Creates a new {@code Builder} instance initialized with the properties of the given {@code FileExportQuery}.
+     *
+     * @param source the {@code FileExportQuery} instance from which to copy properties
+     * @return a new {@code Builder} instance with properties copied from the provided query
      */
-    public static FileExportQuery defaults() {
-        return DEFAULT;
+    public static Builder builder(FileExportQuery source) {
+        return new Builder().from(source);
+    }
+    
+    /**
+     * Get a simple query: "include all files without filtering any nor including special details"
+     * @return {@link ALL}
+     */
+    public static FileExportQuery all() {
+        return ALL;
+    }
+    
+    /**
+     * Get a simple query: "skip all files"
+     * @return {@link NONE}
+     */
+    public static FileExportQuery none() {
+        return NONE;
     }
     
     /**
@@ -104,10 +129,35 @@ public final class FileExportQuery {
         /**
          * Builds an immutable {@link FileExportQuery}.
          *
+         * <p>As per design, the query may not be lacking a description of which files to include and optionally what
+         * metadata about the selected files. If no, no selective or conflicting predicates have been set,
+         * an exception is thrown.</p>
+         *
          * @return validated context
          * @throws IllegalArgumentException if validation fails
          */
         public FileExportQuery build() {
+            if (this.filePredicates.isEmpty()) {
+                throw new IllegalArgumentException("At least one file metadata predicate must be given for a valid query.");
+            }
+            
+            if (this.filePredicates.stream()
+                .filter(p -> !FileMetadataPredicates.relatesToFileMetadata(p))
+                .findFirst()
+                .isEmpty()) {
+                throw new IllegalArgumentException("At least one file metadata predicate must be about selection of files");
+            }
+            
+            Set<FileMetadataPredicates> conflicts = FileMetadataPredicates.checkConflicts(this.filePredicates);
+            if (!conflicts.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Conflicting predicates detected: " +
+                    conflicts.stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(", "))
+                );
+            }
+            
             return new FileExportQuery(this);
         }
         
@@ -131,8 +181,17 @@ public final class FileExportQuery {
      *
      * @return an unmodifiable set of {@link FileMetadataPredicates}; never {@code null}
      */
-    public Set<FileMetadataPredicates> getFilePredicates() {
+    public Set<FileMetadataPredicates> predicates() {
         return Collections.unmodifiableSet(filePredicates);
+    }
+    
+    /**
+     * Determine if this query was built requiring a certain {@link FileMetadataPredicates}.
+     * @param predicate to check for
+     * @return true if required, false otherwise
+     */
+    public boolean requires(FileMetadataPredicates predicate) {
+        return filePredicates.contains(predicate);
     }
     
     @Override
