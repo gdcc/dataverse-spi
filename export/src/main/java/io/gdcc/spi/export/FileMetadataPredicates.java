@@ -42,17 +42,35 @@ public enum FileMetadataPredicates {
     INCLUDE_TABULAR_DATA_VARIABLES()
     ;
     
-    final Set<FileMetadataPredicates> conflicts;
+    /**
+     * When adding new predicates to the enum, make sure to add any entry which is about *metadata*
+     * of files and not the *selection* of files to this set. It is used to ensure any {@link FileExportQuery}
+     * has at least one *selection* predicate present.
+     */
+    private static final Set<FileMetadataPredicates> fileMetadataRelated = Set.of(INCLUDE_TABULAR_DATA_VARIABLES);
     
-    FileMetadataPredicates(FileMetadataPredicates... predicates) {
-       this.conflicts = Set.of(predicates);
+    /**
+     * Determines if the given {@code FileMetadataPredicates} relates to file metadata rather than file selection.
+     *
+     * @param predicate the {@code FileMetadataPredicates} to check
+     * @return {@code true} if the provided predicate is contained in the set of file metadata-related predicates,
+     *         {@code false} otherwise
+     */
+    public static boolean relatesToFileMetadata(FileMetadataPredicates predicate) {
+        return fileMetadataRelated.contains(predicate);
+    }
+    
+    final Set<FileMetadataPredicates> conflictingPredicates;
+    
+    FileMetadataPredicates(FileMetadataPredicates... conflictingPredicates) {
+       this.conflictingPredicates = Set.of(conflictingPredicates);
     }
     
     public boolean conflictsWith(FileMetadataPredicates p) {
         if (p == null) {
             return false;
         }
-        return conflicts.contains(p);
+        return conflictingPredicates.contains(p);
     }
     
     /**

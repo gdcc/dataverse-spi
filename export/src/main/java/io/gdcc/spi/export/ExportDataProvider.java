@@ -4,11 +4,14 @@ package io.gdcc.spi.export;
 import io.gdcc.spi.meta.plugin.CoreProvider;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+import jakarta.json.stream.JsonCollectors;
 import org.w3c.dom.Document;
 
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static io.gdcc.spi.export.FileMetadataPredicates.INCLUDE_TABULAR_DATA_VARIABLES;
 
 /**
  * Provides dataset metadata that can be used by an {@link Exporter} to create
@@ -26,9 +29,12 @@ import java.util.stream.Stream;
  * <h3>Context Handling</h3>
  * Implementations should respect context options where applicable.
  * Not all methods support all context options - see individual method documentation for details.
+ * <p>
  * All methods require a non-null {@link DatasetExportQuery} or {@link FileExportQuery}.
  * Passing null will result in a {@link NullPointerException}.
- * Callers should use {@link DatasetExportQuery#defaults()} respectivelly {@link FileExportQuery#defaults()} instead of passing null.
+ * <p>
+ * Callers should use {@link DatasetExportQuery#defaults()} respectivelly {@link FileExportQuery#all()}
+ * or {@link FileExportQuery#all()} or build their own instead of passing null.
  *
  * @see Exporter
  * @see DatasetExportQuery
@@ -41,9 +47,11 @@ public interface ExportDataProvider extends CoreProvider {
     /**
      * Returns complete dataset metadata in Dataverse's standard JSON format.
      * <p>
-     * This format includes comprehensive dataset-level metadata along with basic
-     * metadata for each file in the dataset. It is the same JSON format used in
-     * the Dataverse API and available as a metadata export option in the UI.
+     * This format prioritizes comprehensive dataset-level metadata.
+     * It is the same JSON format used in the Dataverse API and available as a metadata export option in the UI.
+     * <p>
+     * Optionally, it may include metadata for each file in the dataset, depending on the {@link FileExportQuery}
+     * contained in the given {@link DatasetExportQuery} {@code query}.
      *
      * @param query specification for data retrieval
      * @return dataset metadata in Dataverse JSON format
@@ -53,24 +61,26 @@ public interface ExportDataProvider extends CoreProvider {
      * @apiNote While no formal JSON schema exists for this format, it is well-documented
      *          in the Dataverse guides. Along with OAI_ORE, this is one of only two export
      *          formats that provide complete dataset and file metadata.
-     * @implNote Implementations must respect the {@code datasetMetadataOnly} flag.
-     *           When true, file-level metadata should be excluded to optimize performance
-     *           for datasets with large numbers of files. Other context options
-     *           (publicFilesOnly, offset, length) do not apply and should be ignored.
+     * @implNote Implementations must respect the embedded file export query describing what file metadata to embed.
      */
     JsonObject getDatasetJson(DatasetExportQuery query);
     
     /**
-     * Returns complete dataset metadata using default options.
+     * Returns complete dataset metadata, including basic file metadata (but no details like tabular data metadata).
+     * Note: for datasets with large numbers of files, this may be an issue with memory consumption!
      *
      * @return dataset metadata in Dataverse JSON format
      * @throws ExportException if metadata retrieval fails
      * @since 1.0.0
      * @deprecated since 2.1.0, for removal in 3.0.0. Use {@link #getDatasetJson(DatasetExportQuery)} instead.
+     * @apiNote For backward compatibility, this method includes basic file metadata,
+     *          while the newer methods will not include file metadata by default!
      */
     @Deprecated(since = "2.1.0", forRemoval = true)
     default JsonObject getDatasetJson() {
-        return getDatasetJson(DatasetExportQuery.defaults());
+        return getDatasetJson(DatasetExportQuery.builder()
+            .fileQuery(FileExportQuery.all())
+            .build());
     }
     
     /**
@@ -79,6 +89,9 @@ public interface ExportDataProvider extends CoreProvider {
      * OAI-ORE (Open Archives Initiative Object Reuse and Exchange) provides a structured way to describe
      * aggregations of web resources. This format is used in Dataverse's archival bag export mechanism
      * and available via UI and API.
+     * <p>
+     * Optionally, it may include metadata for each file in the dataset, depending on the {@link FileExportQuery}
+     * contained in the given {@link DatasetExportQuery} {@code query}.
      *
      * @param query specification for data retrieval
      * @return dataset metadata in OAI-ORE format
@@ -88,35 +101,38 @@ public interface ExportDataProvider extends CoreProvider {
      * @apiNote Along with the standard JSON format, this is one of only two export
      *          formats that provide complete dataset-level metadata along with basic
      *          file metadata for each file in the dataset.
-     * @implNote Implementations must respect the {@code datasetMetadataOnly} flag.
-     *           Other context options do not apply and should be ignored.
+     * @implNote Implementations must respect the embedded file export query describing what file metadata to embed.
      */
     JsonObject getDatasetORE(DatasetExportQuery query);
     
     /**
-     * Returns dataset metadata in OAI-ORE format using default options.
+     * Returns dataset metadata in OAI-ORE format, including basic file metadata (but no details like tabular data metadata).
+     * Note: for datasets with large numbers of files, this may be an issue with memory consumption!
      *
      * @return dataset metadata in OAI-ORE format
      * @throws ExportException if metadata retrieval fails
      * @since 1.0.0
      * @deprecated since 2.1.0, for removal in 3.0.0. Use {@link #getDatasetORE(DatasetExportQuery)} instead.
+     * @apiNote For backward compatibility, this method includes basic file metadata,
+     *          while the newer methods will not include file metadata by default!
      */
     @Deprecated(since = "2.1.0", forRemoval = true)
     default JsonObject getDatasetORE() {
-        return getDatasetORE(DatasetExportQuery.defaults());
+        return getDatasetORE(DatasetExportQuery.builder()
+            .fileQuery(FileExportQuery.all())
+            .build());
     }
     
     /**
      * Returns detailed metadata for files in the dataset.
      * <p>
-     * For tabular files that have been successfully ingested, this may include
-     * DDI-centric metadata extracted during the ingest process. This detailed
-     * metadata is not available through other methods in this interface.
-     * </p><p>
-     * The query may specify filters to skip certain files or how much metadata details should be included.
+     * If {@link FileExportQuery} has {@link FileMetadataPredicates#INCLUDE_TABULAR_DATA_VARIABLES} set,
+     * for tabular files that have been successfully ingested, this may include DDI-centric metadata
+     * extracted during the ingest process. This detailed metadata is not available through other methods in this interface.
+     * <p>
+     * The query may specify filters to skip certain files or how many metadata details should be included.
      * The resulting stream will contain a limited number of elements only, specified by a {@code PageRequest},
      * avoiding huge memory allocations in the provider.
-     * </p>
      *
      * @param query specification for file data retrieval
      * @param request the page request containing pagination information such as page offset and page size
@@ -133,15 +149,15 @@ public interface ExportDataProvider extends CoreProvider {
     /**
      * Returns detailed metadata for files in the dataset.
      * <p>
-     * For tabular files that have been successfully ingested, this may include
-     * DDI-centric metadata extracted during the ingest process. This detailed
-     * metadata is not available through other methods in this interface.
-     * </p><p>
-     * The query may specify filters to skip certain files or how much metadata details should be included.
+     * If {@link FileExportQuery} has {@link FileMetadataPredicates#INCLUDE_TABULAR_DATA_VARIABLES} set,
+     * for tabular files that have been successfully ingested, this may include DDI-centric metadata
+     * extracted during the ingest process. This detailed metadata is not available through other methods in this interface.
+     * <p>
+     * The query may specify filters to skip certain files or how many metadata details should be included.
      * The resulting stream will contain all matching files for consumption.
+     * <p>
      * In cases with large metadata quantities use {@link #getDatasetFileDetails(FileExportQuery,PageRequest)}
      * for a stream containing a limited number of elements only, avoiding huge memory allocations in the provider.
-     * </p>
      *
      * @param query specification for file data retrieval
      * @return JSON array with one entry per dataset file (both tabular and non-tabular)
@@ -155,12 +171,12 @@ public interface ExportDataProvider extends CoreProvider {
     Stream<JsonObject> getDatasetFileDetails(FileExportQuery query);
     
     /**
-     * Returns detailed metadata for all files using default options.
+     * Returns all available metadata for all files, including tabular data metadata, if available.
      * <p>
      * Note that this method will serialize all file metadata into one large JSON array.
      * This can be memory-intensive for large datasets and should be used judiciously.
      * There have been reports of unexportable large datasets in production installations.
-     * Using {@link #getDatasetFileDetails(FileExportQuery)} instead is advised.
+     * Using {@link #getDatasetFileDetails(FileExportQuery)} (or its paged variant) instead is advised.
      * </p>
      *
      * @return JSON array with one JSON object entry per dataset file
@@ -170,7 +186,12 @@ public interface ExportDataProvider extends CoreProvider {
      *             or {@link #getDatasetFileDetails(FileExportQuery, PageRequest)}instead.
      */
     @Deprecated(since = "2.1.0", forRemoval = true)
-    JsonArray getDatasetFileDetails();
+    default JsonArray getDatasetFileDetails() {
+        return this.getDatasetFileDetails(FileExportQuery.builder(FileExportQuery.all())
+                                                         .addFilePredicate(INCLUDE_TABULAR_DATA_VARIABLES)
+                                                         .build())
+            .collect(JsonCollectors.toJsonArray());
+    }
     
     /**
      * Returns dataset metadata conforming to the schema.org standard.
