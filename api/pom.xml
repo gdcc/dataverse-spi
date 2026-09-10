@@ -54,7 +54,10 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <!-- Make the shaded artifact the main output of this submodule -->
                             <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <!-- Merge the "-sources" jars of meta/core/export into dataverse-spi-<version>-sources.jar -->
+                            <createSourcesJar>true</createSourcesJar>
                         </configuration>
                     </execution>
                 </executions>
