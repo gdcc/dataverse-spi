@@ -10,6 +10,8 @@
     </parent>
     
     <artifactId>export</artifactId>
+    <name>Dataverse SPI - Export Plugin Contracts</name>
+    <description>Plugin infrastructure to create exporters with contract classes and interfaces</description>
     <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
     <!-- <version>x.y.z.-SNAPSHOT</version> -->
     

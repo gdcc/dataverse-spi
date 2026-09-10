@@ -10,6 +10,8 @@
     </parent>
     
     <artifactId>core</artifactId>
+    <name>Dataverse SPI - Core Plugin Package</name>
+    <description>Core plugin infrastructure, providing the plugin loader implementation</description>
     <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
     <!-- <version>x.y.z.-SNAPSHOT</version> -->
     

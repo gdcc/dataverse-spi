@@ -9,6 +9,8 @@
         <version>2.1.0-SNAPSHOT</version>
     </parent>
     
+    <name>Dataverse SPI - Meta Plugin Package</name>
+    <description>Plugin meta-infrastructure like annotations, base classes, descriptors, and annotation processor</description>
     <artifactId>meta</artifactId>
     <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
     <!-- <version>x.y.z.-SNAPSHOT</version> -->

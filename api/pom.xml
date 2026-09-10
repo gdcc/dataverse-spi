@@ -13,6 +13,8 @@
     <artifactId>dataverse-spi</artifactId>
     <!-- For now, keep all the module versions in lockstep. Can be diversified later. -->
     <!-- <version>x.y.z.-SNAPSHOT</version> -->
+    <name>Dataverse SPI - All-in-One Package</name>
+    <description>One-stop-shop for Dataverse plugins containing all contracts and infrastructure</description>
     
     <!--
         Even with no source code, still package as JAR!
