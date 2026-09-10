@@ -52,6 +52,8 @@
     
     <properties>
         <jdk.version>17</jdk.version>
+        <project.github.org>gdcc</project.github.org>
+        <project.github.repo>dataverse-spi</project.github.repo>
         <project.license.name>Apache License, Version 2.0</project.license.name>
         <project.license.url>https://www.apache.org/licenses/LICENSE-2.0.txt</project.license.url>
         <docs.site.base>/</docs.site.base>
