@@ -39,6 +39,24 @@
             <groupId>io.gdcc.spi</groupId>
             <artifactId>export</artifactId>
         </dependency>
+        
+        <!-- Collection all dependencies from the shaded modules here, as otherwise Javadocs cannot be compiled -->
+        <!-- MAKE SURE TO USE provided AS SCOPE OTHERWISE THESE WILL BE SHADED, TOO! -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
     
     <build>
@@ -62,7 +80,28 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Generate Javadoc from the sources of the aggregated modules -->
+                            <includeDependencySources>true</includeDependencySources>
+                            <dependencySourceIncludes>
+                                <dependencySourceInclude>io.gdcc.spi:*</dependencySourceInclude>
+                            </dependencySourceIncludes>
+                            <!-- This module contributes no sources itself, don't complain about that -->
+                            <skip>false</skip>
+                            <failOnWarnings>false</failOnWarnings>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
-
 </project>
