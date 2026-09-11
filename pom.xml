@@ -142,6 +142,16 @@
                             </bottom>
                         </configuration>
                     </reportSet>
+                    
+                    <reportSet>
+                        <id>test-javadocs</id>
+                        <reports>
+                            <report>test-aggregate</report>
+                        </reports>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </reportSet>
                 </reportSets>
                 <configuration>
                     <!-- Note: configuration here must be repeated, as one contained in <build> is not crossing over! -->
