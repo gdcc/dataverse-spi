@@ -118,22 +118,6 @@
                             <report>aggregate</report>
                         </reports>
                         <configuration>
-                            <!-- Note: configuration here must be repeated, as one contained in <build> is not crossing over! -->
-                            <show>protected</show>
-                            <source>${jdk.version}</source>
-                            <detectLinks>true</detectLinks>
-                            <doclint>${javadoc.lint}</doclint>
-                            <failOnWarnings>false</failOnWarnings>
-                            <quiet>true</quiet>
-                            <!-- Beneficial for bit-equal builds on successive builds -->
-                            <notimestamp>true</notimestamp>
-                            <!-- Add modern tags not yet included by default. https://nipafx.dev/javadoc-tags-apiNote-implSpec-implNote -->
-                            <tags>
-                                <tag><name>apiNote</name><placement>a</placement><head>API Note:</head></tag>
-                                <tag><name>implSpec</name><placement>a</placement><head>Implementation Requirements:</head></tag>
-                                <tag><name>implNote</name><placement>a</placement><head>Implementation Note:</head></tag>
-                            </tags>
-                            
                             <doctitle>Dataverse SPI Plugin API Reference</doctitle>
                             <windowtitle>Dataverse SPI Plugin API Reference</windowtitle>
                             <addStylesheets>
@@ -141,22 +125,42 @@
                             </addStylesheets>
                             <!-- Create a banner on top of every page allowing to return to main docs page   -->
                             <top><![CDATA[
-                        <div class="top-nav-backlink">
-                            <a href="${docs.site.base}index.html">← Back to Dataverse SPI Plugin API homepage</a>
-                        </div>
-                    ]]></top>
+                                <div class="top-nav-backlink">
+                                    <a href="${docs.site.base}index.html">← Back to Dataverse SPI Plugin API homepage</a>
+                                </div>
+                            ]]>
+                            </top>
                             <bottom><![CDATA[
-                        <div>
-                            Version ${project.version} -&nbsp;
-                            Copyright by ${project.organization.name} -&nbsp;
-                            Licensed under <a href="${project.license.url}" target="_blank">${project.license.name}</a> |&nbsp;
-                            <a href="${docs.site.base}index.html">Dataverse SPI Plugin API</a> |&nbsp;
-                            <a href="https://dataverse.org" target="_blank">The Dataverse Project</a>
-                        </div>
-                    ]]></bottom>
+                                <div>
+                                    Version ${project.version} -&nbsp;
+                                    Copyright by ${project.organization.name} -&nbsp;
+                                    Licensed under <a href="${project.license.url}" target="_blank">${project.license.name}</a> |&nbsp;
+                                    <a href="${docs.site.base}index.html">Dataverse SPI Plugin API</a> |&nbsp;
+                                    <a href="https://dataverse.org" target="_blank">The Dataverse Project</a>
+                                </div>
+                            ]]>
+                            </bottom>
                         </configuration>
                     </reportSet>
                 </reportSets>
+                <configuration>
+                    <!-- Note: configuration here must be repeated, as one contained in <build> is not crossing over! -->
+                    <show>protected</show>
+                    <source>${jdk.version}</source>
+                    <detectLinks>true</detectLinks>
+                    <doclint>${javadoc.lint}</doclint>
+                    <failOnWarnings>false</failOnWarnings>
+                    <quiet>true</quiet>
+                    <!-- Beneficial for bit-equal builds on successive builds -->
+                    <notimestamp>true</notimestamp>
+                    <!-- Add modern tags not yet included by default. https://nipafx.dev/javadoc-tags-apiNote-implSpec-implNote -->
+                    <tags>
+                        <tag><name>apiNote</name><placement>a</placement><head>API Note:</head></tag>
+                        <tag><name>implSpec</name><placement>a</placement><head>Implementation Requirements:</head></tag>
+                        <tag><name>implNote</name><placement>a</placement><head>Implementation Note:</head></tag>
+                    </tags>
+                </configuration>
+                
             </plugin>
             
             <plugin>
