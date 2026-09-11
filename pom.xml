@@ -120,14 +120,21 @@
                     </reportSet>
                 </reportSets>
                 <configuration>
+                    <!-- Note: configuration here must be repeated, as one contained in <build> is not crossing over! -->
                     <show>protected</show>
-                    <!-- Remove after Javadocs -->
-                    <doclint>none</doclint>
-                    
-                    <detectLinks>true</detectLinks>
-                    <failOnError>false</failOnError>
-                    <quiet>true</quiet>
                     <source>${jdk.version}</source>
+                    <detectLinks>true</detectLinks>
+                    <doclint>${javadoc.lint}</doclint>
+                    <failOnWarnings>false</failOnWarnings>
+                    <quiet>true</quiet>
+                    <!-- Beneficial for bit-equal builds on successive builds -->
+                    <notimestamp>true</notimestamp>
+                    <!-- Add modern tags not yet included by default. https://nipafx.dev/javadoc-tags-apiNote-implSpec-implNote -->
+                    <tags>
+                        <tag><name>apiNote</name><placement>a</placement><head>API Note:</head></tag>
+                        <tag><name>implSpec</name><placement>a</placement><head>Implementation Requirements:</head></tag>
+                        <tag><name>implNote</name><placement>a</placement><head>Implementation Note:</head></tag>
+                    </tags>
                     
                     <doctitle>Dataverse SPI Plugin API Reference</doctitle>
                     <windowtitle>Dataverse SPI Plugin API Reference</windowtitle>
@@ -149,24 +156,6 @@
                             <a href="https://dataverse.org" target="_blank">The Dataverse Project</a>
                         </div>
                     ]]></bottom>
-                    
-                    <tags>
-                        <tag>
-                            <name>apiNote</name>
-                            <placement>a</placement>
-                            <head>API Note:</head>
-                        </tag>
-                        <tag>
-                            <name>implSpec</name>
-                            <placement>a</placement>
-                            <head>Implementation Requirements:</head>
-                        </tag>
-                        <tag>
-                            <name>implNote</name>
-                            <placement>a</placement>
-                            <head>Implementation Note:</head>
-                        </tag>
-                    </tags>
                 </configuration>
             </plugin>
             
