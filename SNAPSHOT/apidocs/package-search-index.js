@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"io.gdcc.spi.core.loader"},{"l":"io.gdcc.spi.export"},{"l":"io.gdcc.spi.meta.annotations"},{"l":"io.gdcc.spi.meta.descriptor"},{"l":"io.gdcc.spi.meta.plugin"},{"l":"io.gdcc.spi.meta.processor"}];updateSearchResults();

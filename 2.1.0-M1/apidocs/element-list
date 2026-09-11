@@ -1,0 +1,6 @@
+io.gdcc.spi.core.loader
+io.gdcc.spi.export
+io.gdcc.spi.meta.annotations
+io.gdcc.spi.meta.descriptor
+io.gdcc.spi.meta.plugin
+io.gdcc.spi.meta.processor

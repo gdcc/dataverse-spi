@@ -1,0 +1,21 @@
+# Dataverse SPI Plugin API
+
+> A package to create out-of-tree Java code for Dataverse Software. Plugin projects can use this package
+> as an API dependency just like Jakarta EE APIs if they want to create external plugins. These will be loaded
+> at runtime of a Dataverse installation using SPI. See also https://guides.dataverse.org/en/latest/developers
+> for more information.
+
+## Technical Details
+
+- [Modules](https://dataverse.org/modules.html.md)
+
+## Getting Started
+
+- [Examples](https://dataverse.org/examples.html.md)
+- [Dataverse SPI Plugin API](https://dataverse.org/index.html.md)
+- [Project Team](https://dataverse.org/team.html.md)
+
+## Other
+
+- [Project Information](https://dataverse.org/project-info.html.md)
+- [Generated Reports](https://dataverse.org/project-reports.html.md)
