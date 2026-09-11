@@ -173,7 +173,7 @@ public class PluginLoader<T extends Plugin> {
      * @param pluginsLocation the root directory path to search for plugins
      * @return a map where each key is a path to a root classpath (a JAR file or directory) and the corresponding value is
      *         a single-element array containing the generated URL for that location.
-     *         Note: for JARs, the URL is of the form "jar:<urlOfPathToJarFile>!/" as required by {@code URLClassLoader}
+     *         Note: for JARs, URLs are shaped {@code jar:<urlOfPathToJarFile>!/} as required by {@code URLClassLoader}
      * @throws LoaderException if one or more errors occur during directory scanning or URL construction
      *         and no valid mappings could be produced; the exception may contain multiple causes
      *         each associated with a specific file or failure point

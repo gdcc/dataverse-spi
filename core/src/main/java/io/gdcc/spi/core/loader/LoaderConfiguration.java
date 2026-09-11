@@ -70,7 +70,6 @@ public final class LoaderConfiguration {
      * <li>{@code abortOnDuplicatedIdentities = false}</li>
      * <li>{@code enforceUnambiguousPluginIdentities = false}</li>
      * </ul>
-     * </p>
      *
      * @return a {@code LoaderConfiguration} instance with permissive settings.
      */

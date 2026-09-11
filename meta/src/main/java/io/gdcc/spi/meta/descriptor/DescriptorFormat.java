@@ -14,13 +14,11 @@ import java.util.Properties;
  * implementation class, type, contracts, and required providers.
  *
  * <ul>
- * - DESCRIPTOR_DIRECTORY: Specifies the directory where plugin plugin files are located.
- * - PLUGIN_CLASS_FIELD: Defines the key used to identify the plugin's implementation class.
- * - PLUGIN_KIND_FIELD: Defines the key used to specify the base contract type of the plugin.
- * - CONTRACT_PREFIX and CONTRACT_SUFFIX: Define the keys used to denote the contracts
- *   implemented by the plugin and their associated API levels.
- * - REQUIRED_PROVIDER_PREFIX and REQUIRED_PROVIDER_SUFFIX: Define the keys used to represent
- *   required providers and their associated API levels.
+ *   <li>DESCRIPTOR_DIRECTORY: Specifies the directory where plugin plugin files are located.</li>
+ *   <li>PLUGIN_CLASS_FIELD: Defines the key used to identify the plugin's implementation class.</li>
+ *   <li>PLUGIN_KIND_FIELD: Defines the key used to specify the base contract type of the plugin.</li>
+ *   <li>CONTRACT_PREFIX and CONTRACT_SUFFIX: Define the keys used to denote the contracts implemented by the plugin and their associated API levels.</li>
+ *   <li>REQUIRED_PROVIDER_PREFIX and REQUIRED_PROVIDER_SUFFIX: Define the keys used to represent required providers and their associated API levels.</li>
  * </ul>
  */
 public final class DescriptorFormat {

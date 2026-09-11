@@ -63,7 +63,7 @@ import java.util.TreeSet;
  *   <li>all required provider API levels.</li>
  * </ul>
  *
- * <h3>Contract graph rules</h3>
+ * <h2>Contract graph rules</h2>
  *
  * <p>The processor enforces a strict contract hierarchy:</p>
  * <ul>
@@ -77,7 +77,7 @@ import java.util.TreeSet;
  *       capability.</li>
  * </ul>
  *
- * <h3>Service registration</h3>
+ * <h2>Service registration</h2>
  *
  * <p>Service registration generation is intentionally cautious. If any implementation of a given base
  * contract uses {@code @AutoService}, this processor suppresses generated service output for that

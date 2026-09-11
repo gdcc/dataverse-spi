@@ -21,12 +21,12 @@ import static io.gdcc.spi.export.FileMetadataPredicates.INCLUDE_TABULAR_DATA_VAR
  * formats and levels of detail. Exporters should choose the method that best fits
  * their needs, considering the completeness of metadata and performance implications.
  *
- * <h3>Implementation Guide</h3>
+ * <h2>Implementation Guide</h2>
  * Implementers must override the context-accepting versions of all data retrieval
  * methods. No-argument convenience methods are provided as default implementations
  * for backward compatibility but are deprecated and will be removed in a future version.
  *
- * <h3>Context Handling</h3>
+ * <h2>Context Handling</h2>
  * Implementations should respect context options where applicable.
  * Not all methods support all context options - see individual method documentation for details.
  * <p>

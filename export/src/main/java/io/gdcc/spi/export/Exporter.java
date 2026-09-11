@@ -65,7 +65,7 @@ public interface Exporter extends Plugin {
      *          oai_datacite
      *          schema.org
      *          
-     * @return - the unique name of the metadata format this Exporter
+     * @return the unique name of the metadata format this Exporter
      */
     String getFormatName();
 
@@ -78,20 +78,16 @@ public interface Exporter extends Plugin {
     String getDisplayName(Locale locale);
 
     /**
-     * Exporters can specify that they require, as input, the output of another
-     * exporter. This is done by providing the name of that format in response to a
-     * call to this method.
+     * Exporters can specify that they require, as input, the output of another exporter.
+     * This is done by providing the name of that format in response to a call to this method.
      * 
-     * @implNote The one current example where this is done is with the html(display
-     *           name "DDI html codebook") exporter which starts from the XML-based
-     *           ddi format produced by that exporter.
-     * @apiNote - The Exporter can expect that the metadata produced by its
-     *          prerequisite exporter (as defined with this method) will be
-     *          available via the ExportDataProvider.getPrerequisiteInputStream()
-     *          method. The default implementation of this method returns an empty
-     *          value which means the getPrerequisiteInputStream() method of the
-     *          ExportDataProvider sent in the exportDataset method will return an
-     *          empty Optional<InputStream>.
+     * @implNote The one current example where this is done is with the html(display name "DDI html codebook")
+     *           exporter which starts from the XML-based "ddi" format produced by that exporter.
+     * @apiNote The Exporter can expect that the metadata produced by its prerequisite exporter
+     *          (as defined with this method) will be available via {@code ExportDataProvider.getPrerequisiteInputStream()}
+     *          The default implementation of this method returns an empty value which means the
+     *          {@code getPrerequisiteInputStream()} method of the {@code ExportDataProvider} sent in the
+     *          {@code exportDataset()} method will return an empty {@code Optional<InputStream>}.
      * 
      */
     default Optional<String> getPrerequisiteFormatName() {
