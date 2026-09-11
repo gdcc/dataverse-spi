@@ -29,7 +29,9 @@ jobs:
           cache: maven
 
       - id: vars
-        run: echo ::set-output name=version::$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed -E 's/^.*(SNAPSHOT)$/\1/')
+        run: |
+          version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed -E 's/^.*(SNAPSHOT)$/\1/')
+          echo "version=$version" | tee -a "$GITHUB_OUTPUT"
 
       # TODO: Later on, we need to extend this mechanism to provide both version and snapshot,
       #       as well as a different case the stable version and "latest".
